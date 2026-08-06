@@ -1,7 +1,7 @@
 # Templates — Generated Content
 
 The Templates part carries the generated content a project receives from
-the standard at init time ([ADR-021 §3.2](../../docs/architecture/006-b-seven-part-standard-structure.md);
+the standard at init time ([ADR-021 §3.2](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/architecture/006-b-seven-part-standard-structure.md);
 `006-b §3.4`).
 
 ## Build pipeline template

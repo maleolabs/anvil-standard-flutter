@@ -1,7 +1,7 @@
 # Lifecycle Definition — Flutter
 
 The Lifecycle Definition is the framework's lifecycle content: what a
-legal lifecycle *contains* for one framework ([ADR-021 §3.2](../docs/architecture/006-b-seven-part-standard-structure.md);
+legal lifecycle *contains* for one framework ([ADR-021 §3.2](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/architecture/006-b-seven-part-standard-structure.md);
 `006-b §3.2`).
 
 ## Deployment model: hybrid

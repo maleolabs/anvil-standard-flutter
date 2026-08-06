@@ -1,7 +1,7 @@
 # Compatibility — Declared, Validated, Recorded
 
 The Compatibility part makes the standard's validity explicit: declared,
-validated, and recorded — not assumed ([ADR-021 §3.2](../../docs/architecture/006-b-seven-part-standard-structure.md);
+validated, and recorded — not assumed ([ADR-021 §3.2](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/architecture/006-b-seven-part-standard-structure.md);
 `006-b §3.5`).
 
 ## Declared compatibility

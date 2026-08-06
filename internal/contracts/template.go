@@ -1,19 +1,19 @@
 // The template command contract payloads (TS-007-038) are defined in
 // this file. They are data payloads only, consistent with the rest of
 // the package: through the `template` command (contracts.CommandTemplate)
-// the Core fetches the pipeline definitions the adapter owns — the build
-// pipeline and the CI pipeline — at generation time, replacing the
+// the Core fetches the pipeline definitions the standard owns — the
+// build pipeline and the CI pipeline — at generation time, replacing the
 // Core-embedded template functions (ADR-020 §1: framework knowledge
-// moves OUT of the Core binary INTO the adapter binaries).
+// moves OUT of the Core binary INTO the standard executables).
 //
-// The definitions are carried as pipeline.PipelineDefinition — the same
-// type the Core's pipeline loader (internal/execution) parses and
-// validates — so the Core can validate adapter output through the
-// existing loader before writing it to .anvil/pipelines/. The import is
-// one-directional: internal/execution does not import internal/contracts
-// (it imports internal/platform, internal/output, internal/envvar only),
-// so no import cycle exists. Adapters build the definitions with the
-// same type and the Core validates and writes them unchanged.
+// The definitions are carried as pipeline.PipelineDefinition — this
+// standard's mirror of the type the Core's pipeline loader
+// (internal/execution) parses and validates — so the Core can validate
+// the standard's output through the existing loader before writing it to
+// .anvil/pipelines/. The mirror is one-directional: the standard's
+// pipeline package carries the definition types only. The standard
+// builds the definitions with this mirror and the Core validates and
+// writes them unchanged (wire shapes byte-identical, TS-016-02-01).
 //
 // Reference: TS-007-038, ADR-020 §1, 005-adapter-command-contract §5.2
 package contracts

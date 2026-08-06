@@ -1,7 +1,7 @@
 # Flutter Lifecycle Documentation
 
 Adopter documentation for the Flutter delivery lifecycle standard
-([ADR-021 §3.2](../../docs/architecture/006-b-seven-part-standard-structure.md);
+([ADR-021 §3.2](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/architecture/006-b-seven-part-standard-structure.md);
 `006-b §3.6`): what the standard's lifecycle contains, how a project
 adopts it, and what behavior to expect.
 
@@ -85,4 +85,4 @@ The executable resolution contract is unchanged by the repository split
 
 Vocabulary is owned by the delivery lifecycle specification; this
 standard documents its lifecycle behavior and does not redefine
-semantics ([006-v2-architecture-overview §5](../../docs/architecture/006-v2-architecture-overview.md)).
+semantics ([006-v2-architecture-overview §5](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/architecture/006-v2-architecture-overview.md)).

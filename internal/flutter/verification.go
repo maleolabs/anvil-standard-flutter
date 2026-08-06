@@ -8,8 +8,8 @@
 // The artifact path may be either a directory (the extracted artifact,
 // the common case in tests) or an Anvil artifact archive (tar.gz). For
 // archives, entries are scanned directly — no full extraction is
-// performed (docs/sessions/impl-TS-P7-09-TS-P7-10-TS-P7-11-TS-P7-12-
-// 20260801/CONTEXT.md §Known Risks).
+// performed (known-risk decision carried over from the pre-split
+// adapter, docs/sessions in the Core repository §Known Risks).
 package flutter
 
 import (

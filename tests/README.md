@@ -1,7 +1,7 @@
 # Tests — The Standard's Own Tests
 
-The Tests part is the standard's own tests ([Transition Plan §5.4](../../docs/planning/ANVIL_V2_TRANSITION_PLAN.md);
-[ADR-021 §3.2](../../docs/adr/ADR-021-delivery-lifecycle-standard-model.md)):
+The Tests part is the standard's own tests ([Transition Plan §5.4](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/planning/ANVIL_V2_TRANSITION_PLAN.md);
+[ADR-021 §3.2](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/adr/ADR-021-delivery-lifecycle-standard-model.md)):
 the checks that validate that the standard behaves as it declares,
 validated at registry acceptance.
 
@@ -24,6 +24,6 @@ go test -race -count=1 ./...
 Registry acceptance validates the standard on structure, conformance,
 tests, and maintainership (ADR-027); carrying the Tests part at a
 quality the registry validates is the standard's first responsibility
-([007 §2](../../docs/architecture/007-delivery-lifecycle-standard-specification.md)).
+([007 §2](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/architecture/007-delivery-lifecycle-standard-specification.md)).
 The tests concern the standard itself, not an adopting project's
 release — project-facing checks are the Verification part.
