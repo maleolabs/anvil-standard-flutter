@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# release.sh — produce a versioned release of the Laravel delivery lifecycle
+# release.sh — produce a versioned release of the Flutter delivery lifecycle
 # standard and publish it to the registry distribution channel
 # (ADR-023, ADR-030; TS-016-03-02).
 #

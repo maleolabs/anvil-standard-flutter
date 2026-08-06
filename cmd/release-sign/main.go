@@ -1,4 +1,4 @@
-// Command release-sign is the publisher-side signing tool of the Laravel
+// Command release-sign is the publisher-side signing tool of the Flutter
 // delivery lifecycle standard release pipeline (TS-016-03-02; ADR-022,
 // ADR-023, ADR-030).
 //

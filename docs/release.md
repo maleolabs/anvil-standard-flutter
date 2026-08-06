@@ -1,6 +1,6 @@
-# Release — Laravel Delivery Lifecycle Standard
+# Release — Flutter Delivery Lifecycle Standard
 
-This document describes how a versioned release of the Laravel delivery
+This document describes how a versioned release of the Flutter delivery
 lifecycle standard is produced and published to the registry distribution
 channel (TS-016-03-02; ADR-023, ADR-030).
 
