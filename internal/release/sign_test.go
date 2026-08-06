@@ -134,7 +134,7 @@ func TestSignVerifyRoundtrip(t *testing.T) {
 	}
 
 	doc := DeriveDocument(
-		&SourceManifest{ID: "anvil-standard-flutter", Version: "1.0.0", ContractVersion: "1.0.0"},
+		&SourceManifest{ID: "anvil-standard-flutter", Version: "1.0.0", ContractVersion: "1.0.0", Capability: Capability{FrameworkVersion: []string{"3.0.0", "3.22.0", "3.32.0"}}},
 		"1.0.0",
 		"https://github.com/maleolabs/anvil-standard-flutter/releases/download/v1.0.0/anvil-standard-flutter-1.0.0.tar.gz",
 		digest, sig, pubB64,
@@ -185,7 +185,7 @@ func TestVerifyDocument_IntegrityAndAttestation(t *testing.T) {
 		t.Fatalf("AttestationPayload: %v", err)
 	}
 	doc := DeriveDocument(
-		&SourceManifest{ID: "anvil-standard-flutter", Version: "1.0.0", ContractVersion: "1.0.0"},
+		&SourceManifest{ID: "anvil-standard-flutter", Version: "1.0.0", ContractVersion: "1.0.0", Capability: Capability{FrameworkVersion: []string{"3.0.0", "3.22.0", "3.32.0"}}},
 		"1.0.0",
 		"https://github.com/maleolabs/anvil-standard-flutter/releases/download/v1.0.0/anvil-standard-flutter-1.0.0.tar.gz",
 		digest, SignAttestation(payload, priv), pubB64,
