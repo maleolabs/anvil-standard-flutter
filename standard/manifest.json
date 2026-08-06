@@ -1,0 +1,24 @@
+{
+  "$schema": "urn:anvil:spec:registry-metadata:1.0.0",
+  "title": "Flutter Delivery Lifecycle Standard",
+  "description": "The Flutter delivery lifecycle standard for the Anvil Runtime: Flutter lifecycle content for the hybrid deployment model — build targets (web, apk, ios), structural verification checks, configuration extension, and pipeline templates — exchanged over the standard command contract.",
+  "id": "anvil-standard-flutter",
+  "version": "1.0.0",
+  "contractVersion": "1.0.0",
+  "capability": {
+    "frameworkVersion": [
+      "3.0.0",
+      "3.3.0",
+      "3.7.0",
+      "3.10.0",
+      "3.13.0",
+      "3.16.0",
+      "3.19.0",
+      "3.22.0",
+      "3.24.0",
+      "3.27.0",
+      "3.29.0",
+      "3.32.0"
+    ]
+  }
+}
