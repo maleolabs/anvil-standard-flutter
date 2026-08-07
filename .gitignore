@@ -132,5 +132,7 @@ yarn.lock
 # Adapter/standard executable output
 anvil-adapter-flutter
 anvil-adapter-flutter.exe
-*-adapter
 anvil-adapter-*
+# Note: the executable SOURCE lives at cmd/flutter-adapter/ and is tracked;
+# only built binaries named anvil-adapter-* are ignored (the directory
+# pattern *-adapter would hide the source directory, so it is not used).

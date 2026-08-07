@@ -1,0 +1,32 @@
+# CI pipeline scaffold of the Flutter delivery lifecycle standard
+# (TS-007-038, ADR-020 §1): the generic CI scaffold the standard supplies
+# so the ci.yaml output of framework initializations stays complete. The
+# Anvil Runtime writes it to .anvil/pipelines/ci.yaml at project init.
+# This file is the committed documentation copy — the standard executable
+# is the authoritative source.
+#
+# The CI pipeline is generic placeholder data, not framework knowledge:
+# build + test placeholder stages.
+pipeline:
+    name: ci
+    stages:
+        - name: build
+          tasks:
+            - name: build
+              command: echo
+              args:
+                - building...
+        - name: test
+          tasks:
+            - name: unit-tests
+              command: echo
+              args:
+                - running unit tests...
+            - name: static-analysis
+              command: echo
+              args:
+                - running static analysis...
+            - name: linting
+              command: echo
+              args:
+                - running linter...
