@@ -78,7 +78,7 @@ func Capabilities() contracts.CapabilityResult {
 				},
 				{
 					Name:        CheckRollbackBehavior,
-					Description: "validates that rollback produces the declared state: per-phase rollback coverage and manifest rollback metadata matching the phase table (lifecycle-conformity, TS-018-03-02)",
+					Description: "validates that rollback produces the declared state: per-phase rollback coverage with the phase-table-derived rollback surface kept to the declared single re-resolution (standard-internal drift guard, TS-018-03-02)",
 				},
 			},
 		},

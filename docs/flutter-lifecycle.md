@@ -92,8 +92,10 @@ lifecycle-conformity checks of the hybrid model (TS-018-03-02):
   - `platform_sync_ready` — an `ios/` directory carries `ios/Podfile`,
     the platform step's input (no `ios/` → informational no-op, nothing
     to verify)
-  - `rollback_behavior` — per-phase rollback coverage and manifest
-    rollback metadata matching the phase table
+  - `rollback_behavior` — per-phase rollback coverage, with the rollback
+    command surface derived from the phase table kept to the declared
+    single re-resolution (a standard-internal drift guard; the artifact's
+    embedded manifest is not read by this check)
 
 The queue-restart item of the server model does not apply to the hybrid
 model: Flutter releases hold no server-side queue, so there is nothing

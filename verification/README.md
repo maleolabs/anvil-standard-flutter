@@ -42,7 +42,7 @@ nothing to restart or warm, lifecycle/README.md §Semantics).
 | 3 | `dependency_lockfile` | `pubspec.lock` exists in the artifact root | The release's locked dependency set — the hybrid shared resource — is wired: activation's `pub_get` re-resolves exactly the set the artifact was built from |
 | 4 | `dependency_timing` | `pubspec.yaml` **and** `pubspec.lock` exist, and the locked set covers every dependency declared in the manifest | Dependency resolution can run at the declared timing — before promotion — and reproduce the built set, not resolve a different one (the hybrid analog of Laravel's migration timing) |
 | 5 | `platform_sync_ready` | When the release contains an `ios/` directory, `ios/Podfile` exists | The platform step (`platform_sync`, `pod install`) can run at its declared lifecycle point; a release without `ios/` matches the phase's informational no-op and passes with that note |
-| 6 | `rollback_behavior` | Every activation phase declares rollback coverage; the manifest rollback metadata matches the executable phase table | Rollback produces the declared state: `pub_get` rollback is the idempotent re-resolution (`flutter pub get`); `platform_sync` is irreversible — informational, never blocks rollback (TS-P7-10 AC-2) |
+| 6 | `rollback_behavior` | Every activation phase declares rollback coverage; the rollback command surface derived from the phase table stays the declared single re-resolution | Rollback produces the declared state — **standard-internal coherence as a drift guard**: `pub_get` rollback is the idempotent re-resolution (`flutter pub get`); `platform_sync` is irreversible — informational, never blocks rollback (TS-P7-10 AC-2). The check verifies the standard's own declared surface stays coherent; it does **not** read the artifact's embedded manifest (ADR-017) |
 
 Both check categories accept either a directory (the extracted artifact)
 or an Anvil artifact archive (tar.gz; entries scanned directly, with the
@@ -68,6 +68,38 @@ optional `app/` deployable-content prefix stripped).
 - **Unknown checks.** An undeclared check name reports a failed outcome
   with an explanatory message — the runtime never invokes undeclared
   checks (declared-check enforcement is the runtime's responsibility).
+
+## Known limitations
+
+- `dependency_lockfile` and `dependency_timing` read the standard's
+  declared evidence shapes: `pubspec.yaml` (two-space-indented
+  `dependencies:` / `dev_dependencies:` entries) and `pubspec.lock`
+  (two-space-indented `packages:` entries), the canonical shapes
+  `flutter create` and `pub get` write. A manifest that heavily
+  customizes the indentation shape yields no extractable entries — the
+  check fails closed rather than guessing; a manifest that declares no
+  dependencies at all passes with a note (nothing to re-check).
+- `dependency_timing` coverage is **name-level**: it verifies every
+  declared dependency name is present in the locked set. Version
+  conformity (the locked version satisfying the declared constraint) is
+  not verifiable from the artifact without build-time evidence — the
+  runtime's verification report should be paired with build outputs for
+  version-level claims.
+- `platform_sync_ready` verifies **readiness** — the platform step
+  (`pod install`) can run at its declared lifecycle point because the
+  release carries `ios/` with its `ios/Podfile` input. It does not
+  verify post-step execution evidence (the step ran successfully);
+  execution outcomes are the activation contract's record, and the
+  runtime's verification report should be paired with activation
+  outcomes for execution-level claims.
+- `platform_sync_ready` uses the fixed platform input path `ios/Podfile`;
+  a project that relocates the Podfile outside the canonical path is not
+  re-checkable from the artifact.
+- `rollback_behavior` is a standard-internal coherence check: it
+  verifies the standard's own declared rollback surface stays coherent
+  (a drift guard). It does not read the artifact's embedded manifest
+  (ADR-017) — artifact-manifest rollback metadata is the runtime's
+  manifest contract surface.
 
 ## Contract rules
 

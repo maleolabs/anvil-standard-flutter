@@ -596,6 +596,22 @@ func TestRunVerification_DependencyTiming(t *testing.T) {
 		}
 	})
 
+	t.Run("archive_fail_declared_dependency_not_locked", func(t *testing.T) {
+		// Archive variant of the unlocked-dependency failure: the
+		// content-read path must surface the same outcome.
+		artifactPath := writeArtifactArchiveContents(t, map[string]string{
+			"pubspec.yaml": pubspecFixture,
+			"pubspec.lock": strings.Replace(lockFixture, "  http:\n", "", 1),
+		})
+		outcome := RunVerification(contracts.VerificationRequest{Check: CheckDependencyTiming, ArtifactPath: artifactPath})
+		if outcome.Passed {
+			t.Errorf("Passed = true, want false (outcome: %#v)", outcome)
+		}
+		if !strings.Contains(outcome.Details, "not locked") {
+			t.Errorf("Details = %q, want it to report the unlocked dependency", outcome.Details)
+		}
+	})
+
 	t.Run("fail_non_canonical_manifest_fails_closed", func(t *testing.T) {
 		// A manifest that does not match the canonical two-space shape
 		// (here: four-space indentation) yields no extractable declared
@@ -614,6 +630,23 @@ func TestRunVerification_DependencyTiming(t *testing.T) {
 		}
 	})
 
+	t.Run("pass_manifest_without_dependencies_section", func(t *testing.T) {
+		// A manifest that declares no dependencies section at all has
+		// nothing to re-check: the locked set trivially covers the
+		// declared (empty) set.
+		artifactPath := writeArtifactContents(t, map[string]string{
+			"pubspec.yaml": "name: my_app\nversion: 1.0.0\n",
+			"pubspec.lock": "# empty\npackages:\nsdks:\n  dart: \">=3.0.0 <4.0.0\"\n",
+		})
+		outcome := RunVerification(contracts.VerificationRequest{Check: CheckDependencyTiming, ArtifactPath: artifactPath})
+		if !outcome.Passed {
+			t.Errorf("Passed = false, want true (outcome: %#v)", outcome)
+		}
+		if !strings.Contains(outcome.Details, "declares no dependencies") {
+			t.Errorf("Details = %q, want it to report the no-dependencies case", outcome.Details)
+		}
+	})
+
 	t.Run("archive_pass", func(t *testing.T) {
 		artifactPath := writeArtifactArchiveContents(t, map[string]string{
 			"pubspec.yaml": pubspecFixture,
@@ -622,6 +655,22 @@ func TestRunVerification_DependencyTiming(t *testing.T) {
 		outcome := RunVerification(contracts.VerificationRequest{Check: CheckDependencyTiming, ArtifactPath: artifactPath})
 		if !outcome.Passed {
 			t.Errorf("Passed = false, want true (outcome: %#v)", outcome)
+		}
+	})
+
+	t.Run("fail_corrupt_archive_read_path", func(t *testing.T) {
+		// A path that is not a gzip archive must fail the content-read
+		// path with a descriptive detail, not hang or panic.
+		corrupt := filepath.Join(t.TempDir(), "artifact.tar.gz")
+		if err := os.WriteFile(corrupt, []byte("not a gzip archive"), 0644); err != nil {
+			t.Fatalf("write corrupt archive: %v", err)
+		}
+		outcome := RunVerification(contracts.VerificationRequest{Check: CheckDependencyTiming, ArtifactPath: corrupt})
+		if outcome.Passed {
+			t.Errorf("Passed = true, want false (outcome: %#v)", outcome)
+		}
+		if !strings.Contains(outcome.Details, "not a gzip archive") {
+			t.Errorf("Details = %q, want it to report the corrupt archive", outcome.Details)
 		}
 	})
 
@@ -672,6 +721,21 @@ func TestRunVerification_PlatformSyncReady(t *testing.T) {
 		}
 	})
 
+	t.Run("pass_ios_file_not_directory", func(t *testing.T) {
+		// A regular file named "ios" is not the ios/ directory the
+		// platform_sync phase's requiresDir semantics declare — the
+		// phase stays an informational no-op (same structural
+		// convention as dirHasEntry in the activation phase table).
+		artifactPath := writeArtifactDir(t, "ios")
+		outcome := RunVerification(contracts.VerificationRequest{Check: CheckPlatformSyncReady, ArtifactPath: artifactPath})
+		if !outcome.Passed {
+			t.Errorf("Passed = false, want true (outcome: %#v)", outcome)
+		}
+		if !strings.Contains(outcome.Details, "no ios/ directory") {
+			t.Errorf("Details = %q, want it to report the absent ios/ directory", outcome.Details)
+		}
+	})
+
 	t.Run("fail_ios_without_podfile", func(t *testing.T) {
 		artifactPath := writeArtifactContents(t, map[string]string{
 			"ios/Podfile.lock": "PODS:\n",
@@ -710,8 +774,9 @@ func TestRunVerification_PlatformSyncReady(t *testing.T) {
 
 // TestRunVerification_RollbackBehavior verifies the rollback-behavior
 // check (TS-018-03-02): rollback produces the declared state — every
-// phase declares rollback coverage, and the manifest rollback metadata
-// matches the phase table.
+// phase declares rollback coverage, and the rollback command surface
+// derived from the phase table stays the declared single re-resolution
+// (standard-internal coherence, a drift guard).
 func TestRunVerification_RollbackBehavior(t *testing.T) {
 	t.Run("pass_declared_semantics", func(t *testing.T) {
 		artifactPath := writeArtifactDir(t, "pubspec.yaml")
@@ -723,7 +788,7 @@ func TestRunVerification_RollbackBehavior(t *testing.T) {
 			"rollback produces the declared state",
 			"pub_get: pub get",
 			"informational (irreversible, rollback never blocks)",
-			"manifest rollback metadata matches",
+			"standard-internal coherence",
 		} {
 			if !strings.Contains(outcome.Details, want) {
 				t.Errorf("Details = %q, want it to contain %q", outcome.Details, want)
@@ -787,10 +852,10 @@ func TestRunVerification_RollbackBehavior(t *testing.T) {
 		}
 	})
 
-	t.Run("fail_manifest_rollback_drift", func(t *testing.T) {
+	t.Run("fail_rollback_surface_drift", func(t *testing.T) {
 		// The phase table declares a second reversible phase, so the
-		// manifest rollback surface would drift from the declared
-		// single re-resolution.
+		// rollback surface derived from it would drift from the
+		// declared single re-resolution.
 		original := activationPhases
 		activationPhases = []activationPhase{
 			{name: "pub_get", program: "flutter", activateArgs: []string{"pub", "get"}, rollbackArgs: []string{"pub", "get"}},
@@ -805,7 +870,7 @@ func TestRunVerification_RollbackBehavior(t *testing.T) {
 		if outcome.Passed {
 			t.Errorf("Passed = true, want false (outcome: %#v)", outcome)
 		}
-		for _, want := range []string{"manifest rollback metadata", "drifts from the executable phase table"} {
+		for _, want := range []string{"rollback command surface", "drifts from the declared single re-resolution"} {
 			if !strings.Contains(outcome.Details, want) {
 				t.Errorf("Details = %q, want it to contain %q", outcome.Details, want)
 			}

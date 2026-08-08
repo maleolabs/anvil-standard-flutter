@@ -83,11 +83,15 @@ const (
 	// CheckRollbackBehavior validates that rollback produces the
 	// declared state: every activation phase declares its rollback
 	// coverage (a rollback command when reversible, the irreversible
-	// marker when not), and the manifest rollback metadata matches the
-	// executable phase table (TS-018-03-02: rollback behavior, Review
-	// 19 §3.3; TS-018-02-01 — pub_get rollback is the idempotent
-	// re-resolution, platform_sync is irreversible and never blocks
-	// rollback).
+	// marker when not), and the rollback command surface derived from
+	// the phase table stays the declared single re-resolution
+	// (TS-018-03-02: rollback behavior, Review 19 §3.3; TS-018-02-01 —
+	// pub_get rollback is the idempotent re-resolution, platform_sync
+	// is irreversible and never blocks rollback). This is a
+	// standard-internal coherence check — a drift guard against the
+	// declared phase table diverging from the declared rollback
+	// semantics; it does NOT read the artifact's embedded manifest
+	// (ADR-017), which is the runtime's manifest contract surface.
 	CheckRollbackBehavior = "rollback_behavior"
 )
 
@@ -327,6 +331,27 @@ func failOutcome(checkName, details string) contracts.VerificationOutcome {
 // write are two-space-indented, so the pattern is pinned to that shape.
 var pubspecEntryPattern = regexp.MustCompile(`^  ([a-zA-Z0-9_\-]+):`)
 
+// pubspecDeclaresDependencies reports whether the pubspec.yaml content
+// declares a dependencies or dev_dependencies section at all — as
+// opposed to having one with entries that fail to parse. A manifest
+// without either section declares no dependencies, which is a legitimate
+// (if unusual for a Flutter app) state: there is nothing to re-check.
+func pubspecDeclaresDependencies(data []byte) bool {
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if startsWithIndent(line) {
+			continue
+		}
+		if strings.HasPrefix(line, "dependencies:") || strings.HasPrefix(line, "dev_dependencies:") {
+			return true
+		}
+	}
+	return false
+}
+
 // pubspecDeclaredDependencies returns the dependency names declared in
 // the dependencies and dev_dependencies sections of a pubspec.yaml
 // content. The scan is line-oriented: within each section, every
@@ -453,10 +478,15 @@ func checkDependencyTiming(artifactPath string) contracts.VerificationOutcome {
 	locked := pubspecLockPackages(lockData)
 
 	// A canonical Flutter app manifest always declares the flutter SDK
-	// dependency; an empty extraction means the manifest does not match
-	// the canonical two-space shape, so the timing evidence cannot be
-	// re-checked and the check fails closed.
+	// dependency; distinguish a manifest that declares no dependencies
+	// at all (nothing to re-check — pass with a note) from a manifest
+	// whose entries fail to parse in the canonical two-space shape
+	// (un-re-checkable evidence — fail closed).
 	if len(declared) == 0 {
+		if !pubspecDeclaresDependencies(manifestData) {
+			return passOutcome(CheckDependencyTiming,
+				"manifest declares no dependencies — nothing to re-check: pubspec.yaml and pubspec.lock are present and the locked set trivially covers the declared (empty) set")
+		}
 		return failOutcome(CheckDependencyTiming,
 			"no dependency entries found in pubspec.yaml in the canonical two-space shape: the declared dependency set cannot be re-checked")
 	}
@@ -517,8 +547,16 @@ func checkPlatformSyncReady(artifactPath string) contracts.VerificationOutcome {
 // rollback coverage — a reversible phase carries a rollback command, an
 // irreversible phase is marked irreversible with no command (the adapter
 // reports an informational success that never blocks rollback, TS-P7-10
-// AC-2); and the manifest rollback metadata must match the executable
-// phase table (only the reversible pub_get phase's re-resolution).
+// AC-2) — and the rollback command surface derived from the phase table
+// (ManifestCommands) must stay the declared single re-resolution.
+//
+// Scope note: this is a standard-internal coherence check — a drift
+// guard against the phase table diverging from the declared rollback
+// semantics. It derives both sides of the comparison from the standard's
+// own phase table and does NOT read the artifact's embedded manifest
+// (ADR-017); artifact-manifest rollback metadata is the runtime's
+// manifest contract surface (same decision as the Laravel track,
+// TS-018-03-01 M-2).
 //
 // Reference: TS-018-03-02, Review 19 §3.3, TS-018-02-01
 func checkRollbackBehavior(artifactPath string) contracts.VerificationOutcome {
@@ -547,7 +585,7 @@ func checkRollbackBehavior(artifactPath string) contracts.VerificationOutcome {
 	wantRollback := []string{commandString("flutter", []string{"pub", "get"})}
 	if !slices.Equal(manifestRollback, wantRollback) {
 		return failOutcome(CheckRollbackBehavior, fmt.Sprintf(
-			"manifest rollback metadata (%s) drifts from the executable phase table (%s): only the reversible phase's re-resolution may appear in rollback — the surfaces must not diverge",
+			"rollback command surface derived from the phase table (%s) drifts from the declared single re-resolution (%s): only the reversible phase's re-resolution may appear in rollback",
 			strings.Join(manifestRollback, "; "), strings.Join(wantRollback, "; ")))
 	}
 
@@ -560,7 +598,7 @@ func checkRollbackBehavior(artifactPath string) contracts.VerificationOutcome {
 		}
 	}
 	return passOutcome(CheckRollbackBehavior, fmt.Sprintf(
-		"rollback produces the declared state: %s; manifest rollback metadata matches the phase table",
+		"rollback produces the declared state: %s; rollback surface derived from the phase table stays the declared single re-resolution (standard-internal coherence)",
 		strings.Join(coverage, "; ")))
 }
 
@@ -585,9 +623,17 @@ func artifactReadFile(artifactPath, relPath string) ([]byte, bool, error) {
 	return readArchiveEntry(artifactPath, relPath)
 }
 
+// maxArchiveEntryRead bounds the bytes read from a single archive entry
+// by readArchiveEntry. The lifecycle-conformity checks read small
+// text files (pubspec.yaml, pubspec.lock); the limit prevents a
+// malicious or corrupt archive from forcing unbounded memory allocation.
+const maxArchiveEntryRead = 8 << 20 // 8 MiB
+
 // readArchiveEntry scans a tar.gz archive for relPath (accepting the
 // optional "app/" deployable-content prefix) and returns the content of
-// the first matching regular-file entry.
+// the first matching regular-file entry. Entry content is read through a
+// bounded reader (maxArchiveEntryRead) so oversized entries fail with a
+// descriptive error instead of exhausting memory.
 func readArchiveEntry(archivePath, relPath string) ([]byte, bool, error) {
 	f, err := os.Open(archivePath)
 	if err != nil {
@@ -612,9 +658,14 @@ func readArchiveEntry(archivePath, relPath string) ([]byte, bool, error) {
 		}
 		name := strings.TrimPrefix(hdr.Name, "app/")
 		if name == relPath && hdr.Typeflag == tar.TypeReg {
-			data, err := io.ReadAll(tr)
+			data, err := io.ReadAll(io.LimitReader(tr, maxArchiveEntryRead+1))
 			if err != nil {
 				return nil, false, err
+			}
+			if len(data) > maxArchiveEntryRead {
+				return nil, false, fmt.Errorf(
+					"archive entry %q exceeds the %d-byte read limit",
+					relPath, maxArchiveEntryRead)
 			}
 			return data, true, nil
 		}
