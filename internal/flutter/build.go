@@ -24,10 +24,8 @@
 package flutter
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"slices"
 	"strings"
 
@@ -118,27 +116,13 @@ type commandRunner func(ctx context.Context, dir string, args ...string) (output
 //
 // On failure the error carries the flutter stderr (or the exit error
 // when stderr is empty) so build failures report actionable details
-// (TS-P7-21).
+// (TS-P7-21). The implementation is shared with the activation phase
+// runners (internal/flutter/activation.go — runProgram); the activation
+// phases reuse this runner for their flutter program phases.
 //
-// Reference: TS-P7-21, 004-review-resolutions D1
+// Reference: TS-P7-21, TS-018-02-01, 004-review-resolutions D1
 func runFlutter(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "flutter", args...)
-	if dir != "" {
-		cmd.Dir = dir
-	}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		detail := strings.TrimSpace(stderr.String())
-		if detail == "" {
-			detail = err.Error()
-		}
-		return stdout.String(), fmt.Errorf("flutter %s failed: %s", strings.Join(args, " "), detail)
-	}
-	return stdout.String(), nil
+	return runProgram(ctx, "flutter", dir, args...)
 }
 
 // RunBuild executes the adapter's build pipeline: each target in build

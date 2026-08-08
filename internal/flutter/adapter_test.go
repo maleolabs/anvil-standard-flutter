@@ -1,6 +1,7 @@
 // Tests for the Flutter adapter's declared capabilities (TS-P7-20,
-// TS-P7-21): the deployment model, the absence of activation phases, and
-// the build phases the capability declaration exposes to the Core.
+// TS-P7-21, TS-018-02-01): the deployment model, the hybrid activation
+// phases, and the build phases the capability declaration exposes to the
+// Core.
 package flutter
 
 import (
@@ -35,16 +36,18 @@ func TestCapabilities_DeclaresDeploymentModel(t *testing.T) {
 	}
 }
 
-// TestCapabilities_NoActivationPhases verifies that the declaration
-// lists no activation phases — the hybrid model has no server activation
-// (TS-P7-20 AC-5, EPIC-007 §7.3). The `activate` command is absent from
-// the dispatcher as well (command_test.go).
+// TestCapabilities_DeclaresActivationPhases verifies that the declaration
+// lists the hybrid model's activation phases in declared order — pub_get
+// (dependency resolution) then platform_sync (platform steps) — mirroring
+// the activation phase table exactly (TS-018-02-01, TS-P7-20 AC-4).
+// The `activate` command is dispatched for these phases (command_test.go).
 //
-// Reference: TS-P7-20 AC-5
-func TestCapabilities_NoActivationPhases(t *testing.T) {
+// Reference: TS-018-02-01, TS-P7-20 AC-4
+func TestCapabilities_DeclaresActivationPhases(t *testing.T) {
 	result := Capabilities()
-	if len(result.Declaration.ActivationPhases) != 0 {
-		t.Errorf("ActivationPhases = %v, want none for the hybrid model", result.Declaration.ActivationPhases)
+	want := []string{PhasePubGet, PhasePlatformSync}
+	if !reflect.DeepEqual(result.Declaration.ActivationPhases, want) {
+		t.Errorf("ActivationPhases = %v, want %v (declared order)", result.Declaration.ActivationPhases, want)
 	}
 }
 
