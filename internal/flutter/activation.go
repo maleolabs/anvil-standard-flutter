@@ -307,15 +307,18 @@ func runActivationPhase(ctx context.Context, flutterRunner, podRunner commandRun
 	}
 }
 
-// dirHasEntry reports whether the directory contains the named entry.
-// An empty dir refers to the current working directory. The check is
-// structural — the same approach as the standard's verification checks
-// (pubspec.yaml, lib/ presence) — so the phase's applicability follows
-// from the release contents, not from contract fields (the release
-// context is generic and carries no target information).
+// dirHasEntry reports whether the directory contains the named
+// DIRECTORY entry. An empty dir refers to the current working directory.
+// The check is structural — the same approach as the standard's
+// verification checks (pubspec.yaml, lib/ presence) — so the phase's
+// applicability follows from the release contents, not from contract
+// fields (the release context is generic and carries no target
+// information). A file with the same name does not satisfy the check:
+// the declared semantics is "contains an ios/ directory", not "contains
+// an entry named ios".
 func dirHasEntry(dir, name string) bool {
-	_, err := os.Stat(filepath.Join(dir, name))
-	return err == nil
+	info, err := os.Stat(filepath.Join(dir, name))
+	return err == nil && info.IsDir()
 }
 
 // irreversibleActivationRollbackResult reports an informational success
@@ -338,24 +341,36 @@ func irreversibleActivationRollbackResult(p activationPhase) contracts.Activatio
 // ManifestCommands returns the activation and rollback command strings
 // stored in the artifact manifest at packaging time (ADR-017) and
 // executed by the orchestrator during release activation and rollback.
+// The strings derive from the activation phase table in table order —
+// activation carries every phase's command (join(program, activateArgs)),
+// rollback carries only the phases with a rollback operation
+// (rollbackArgs != nil, i.e. the non-irreversible phases) — so the
+// manifest surface and the executable phase table cannot drift.
 //
-// The metadata records the full activation command set in execution
-// order. The platform_sync entry is conditional by nature — it applies
-// when the release working directory contains an ios/ directory and the
-// host is macOS (ADR-018 platform-aware execution); the metadata form
-// records the command, the executable phase table carries the
-// conditions. The rollback metadata carries the reversible phase's
-// rollback command only; irreversible phases reverse nothing.
+// The platform_sync entry is conditional by nature — it applies when the
+// release working directory contains an ios/ directory and the host is
+// macOS (ADR-018 platform-aware execution); the metadata form records
+// the command, the executable phase table carries the conditions.
 //
 // Reference: TS-018-02-01, TS-P7-15, TS-P7-16, ADR-017
 func ManifestCommands() contracts.ManifestCommandResult {
-	return contracts.ManifestCommandResult{
-		ActivationCommands: []string{
-			"flutter pub get",
-			"pod install",
-		},
-		RollbackCommands: []string{
-			"flutter pub get",
-		},
+	activation := make([]string, 0, len(activationPhases))
+	rollback := make([]string, 0, len(activationPhases))
+	for _, p := range activationPhases {
+		activation = append(activation, commandString(p.program, p.activateArgs))
+		if p.rollbackArgs != nil {
+			rollback = append(rollback, commandString(p.program, p.rollbackArgs))
+		}
 	}
+	return contracts.ManifestCommandResult{
+		ActivationCommands: activation,
+		RollbackCommands:   rollback,
+	}
+}
+
+// commandString renders one phase operation as its full command string —
+// the program followed by the space-joined arguments (e.g. "flutter pub
+// get"). It is the string form the artifact manifest stores (ADR-017).
+func commandString(program string, args []string) string {
+	return strings.Join(append([]string{program}, args...), " ")
 }

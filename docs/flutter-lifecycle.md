@@ -26,9 +26,9 @@ distributing the packaged artifact (web bundle, APK, iOS app).
 
 ## Activation
 
-`anvil release activate` (or the runtime's activation phase sequence)
-runs the standard's declared activation phases in declared order from
-the release working directory:
+The runtime's activation phase sequence (in the CLI, `anvil deployment
+activate`, TD-006) runs the standard's declared activation phases in
+declared order from the release working directory:
 
 | # | Phase | Command | Reversible |
 |---|---|---|---|

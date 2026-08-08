@@ -358,6 +358,62 @@ func TestManifestCommands(t *testing.T) {
 	}
 }
 
+// TestManifestCommands_MatchesPhaseTable verifies the manifest command
+// strings derive from the activation phase table in table order: every
+// phase contributes its command string to the activation list, and only
+// the phases with a rollback operation (rollbackArgs != nil — the
+// non-irreversible phases) contribute to the rollback list. The manifest
+// surface and the executable phase table cannot drift (TS-018-02-01,
+// ADR-017).
+func TestManifestCommands_MatchesPhaseTable(t *testing.T) {
+	result := ManifestCommands()
+
+	wantActivation := make([]string, 0, len(activationPhases))
+	for _, p := range activationPhases {
+		wantActivation = append(wantActivation, commandString(p.program, p.activateArgs))
+	}
+	if !reflect.DeepEqual(result.ActivationCommands, wantActivation) {
+		t.Errorf("ActivationCommands = %v, want table-derived %v", result.ActivationCommands, wantActivation)
+	}
+
+	wantRollback := make([]string, 0, len(activationPhases))
+	for _, p := range activationPhases {
+		if p.rollbackArgs == nil {
+			continue
+		}
+		wantRollback = append(wantRollback, commandString(p.program, p.rollbackArgs))
+	}
+	if !reflect.DeepEqual(result.RollbackCommands, wantRollback) {
+		t.Errorf("RollbackCommands = %v, want table-derived %v", result.RollbackCommands, wantRollback)
+	}
+}
+
+// TestRunActivation_PlatformSyncIOSFileNotDir verifies the platform_sync
+// conditional applicability edge: a FILE named ios in the release
+// working directory does NOT satisfy requiresDir — the declared
+// semantics is "contains an ios/ directory" — so the phase reports an
+// informational no-op and runs no command (TS-018-02-01).
+func TestRunActivation_PlatformSyncIOSFileNotDir(t *testing.T) {
+	withPlatform(t, PlatformDarwin)
+	f, p := fakes()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ios"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("create ios file: %v", err)
+	}
+
+	result := runActivation(t, f, p, activationRequest(PhasePlatformSync, contracts.PhaseOperationActivate, dir))
+
+	if !result.Success {
+		t.Fatalf("Success = false, want true — a file named ios is not platform state")
+	}
+	if len(p.args) != 0 {
+		t.Errorf("pod runner invocations = %d, want 0 — no command runs for a file named ios", len(p.args))
+	}
+	if !strings.Contains(result.Output, "skipped") {
+		t.Errorf("Output = %q, want an informational skip message", result.Output)
+	}
+}
+
 // releaseDirWithIOS returns a temporary directory containing an ios/
 // entry, simulating a Flutter release working directory with native iOS
 // platform state.
