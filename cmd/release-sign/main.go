@@ -41,6 +41,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"maleolabs.com/anvil-standard-flutter/internal/release"
 )
@@ -121,6 +122,7 @@ func runSign(args []string) int {
 	location := fs.String("location", "", "https distribution.location of the archive on the release channel")
 	key := fs.String("key", "", "path of the Ed25519 signing private key (PEM PKCS#8)")
 	binaries := fs.String("binaries", "", "path of the platform binaries staging directory (binaries/); every regular file becomes a named attestation-bound contentDigests entry (TS-014-04-04)")
+	sig := fs.String("sig", "", "path of the detached document signature asset (registry-metadata-<v>.json.sig): the Ed25519 signature over the raw document bytes, base64 (F-1)")
 	out := fs.String("out", "", "path of the produced registry metadata document (default: stdout)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -195,6 +197,21 @@ func runSign(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: derived document failed the self-parse guard: %v\n", err)
 		return 1
 	}
+	// The detached document signature (F-1) covers the EXACT bytes that
+	// are written to the release asset — the same bytes the bootstrap
+	// installer (install.sh) verifies with its pinned publisher key.
+	docBytes, err := release.DocumentBytes(doc)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if *sig != "" {
+		sigB64 := release.SignDocumentBytes(docBytes, priv)
+		if err := os.WriteFile(*sig, []byte(sigB64+"\n"), 0o644); err != nil {
+			fmt.Fprintf(os.Stderr, "error: write detached signature %s: %v\n", *sig, err)
+			return 1
+		}
+	}
 	if *out == "" {
 		if err := release.WriteDocument(doc, "/dev/stdout"); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -217,6 +234,7 @@ func runVerify(args []string) int {
 	document := fs.String("document", "", "path of the produced registry metadata document")
 	archive := fs.String("archive", "", "path of the release archive (the release content)")
 	binaries := fs.String("binaries", "", "path of the platform binaries staging directory (binaries/); every binary asset is verified against its declared named digest (TS-014-04-04)")
+	sig := fs.String("sig", "", "path of the detached document signature asset (registry-metadata-<v>.json.sig); the signature is verified over the RAW document bytes with the document's declared public key (F-1)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -242,6 +260,25 @@ func runVerify(args []string) int {
 	if *binaries != "" {
 		if err := release.VerifyBinaryAssetDigests(doc, *binaries); err != nil {
 			fmt.Fprintf(os.Stderr, "error: binary asset verification failed: %v\n", err)
+			return 1
+		}
+	}
+	if *sig != "" {
+		// The detached signature covers the RAW bytes of the document
+		// asset — verify against the file bytes, not the parsed doc.
+		raw, err := os.ReadFile(*document)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: read %s: %v\n", *document, err)
+			return 1
+		}
+		sigRaw, err := os.ReadFile(*sig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: read detached signature %s: %v\n", *sig, err)
+			return 1
+		}
+		sigB64 := strings.TrimSpace(string(sigRaw))
+		if err := release.VerifyDocumentSignature(raw, sigB64, doc.Trust.Attestation.PublicKey); err != nil {
+			fmt.Fprintf(os.Stderr, "error: detached document signature verification failed: %v\n", err)
 			return 1
 		}
 	}
