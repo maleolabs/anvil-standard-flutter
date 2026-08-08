@@ -142,6 +142,7 @@ published to the registry (EPIC-016 scope, TS-016-03-02).
 |---|---|---|
 | **Maintainer** | Maleo Labs | The organization accountable for this standard (ADR-027 §3; Transition Plan §4.3 — standards are owned by their maintainers, not by Core: initially Maleo Labs, with per-framework owners as the ecosystem grows) |
 | **Repository** | `maleolabs/anvil-standard-flutter` | Where the standard lives, changes, and is reviewed; issue reports and content fixes are filed here |
+| **Contact** | `engineering@maleolabs.com` | The org contact channel for maintainer accountability: conformance questions, content defects, and deprecation concerns reach the accountable maintainer through this address (same org channel as the Laravel standard) |
 | **Accountability** | Content correctness, conformance, tests, freshness, deprecation | The maintainer keeps the standard conformant with its declared contract version, its tests passing and registry-validated, its templates fresh against the supported framework versions (007 §7, Transition Plan §4.7), and its deprecation governed (ADR-027 §3) |
 
 Core does not patch this standard (ADR-027 §3, §5.5): a standard that

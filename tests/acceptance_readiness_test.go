@@ -55,6 +55,19 @@ func containsAll(content string, required ...string) []string {
 	return missing
 }
 
+// activationSection returns the slice of a lifecycle document starting
+// at its activation heading ("## Activation"). Order assertions run
+// against this slice so a phase name mentioned in a table of contents
+// or an unrelated section cannot influence them.
+func activationSection(t *testing.T, name, doc string) string {
+	t.Helper()
+	loc := regexp.MustCompile(`(?m)^## Activation`).FindStringIndex(doc)
+	if loc == nil {
+		t.Fatalf("%s has no \"## Activation\" heading — cannot scope the activation-order assertions", name)
+	}
+	return doc[loc[0]:]
+}
+
 // TestLifecycleContent_DeclaresActivationPhasesAndRollback verifies the
 // Lifecycle Definition part (lifecycle/README.md) and the Documentation
 // part (docs/flutter-lifecycle.md) declare the activation phase content
@@ -75,6 +88,12 @@ func TestLifecycleContent_DeclaresActivationPhasesAndRollback(t *testing.T) {
 		t.Fatalf("executable activation phase declaration = %v, want [pub_get platform_sync]", declared)
 	}
 
+	// The manifest command strings derived from the phase table (ADR-017):
+	// activation "flutter pub get" then "pod install", rollback "flutter
+	// pub get" only. Declared here so the order and command assertions
+	// below compare against the executable surface.
+	commands := flutter.ManifestCommands()
+
 	for _, doc := range map[string]string{
 		"lifecycle/README.md":       lifecycle,
 		"docs/flutter-lifecycle.md": docs,
@@ -85,11 +104,24 @@ func TestLifecycleContent_DeclaresActivationPhasesAndRollback(t *testing.T) {
 	}
 
 	// Declared order: pub_get (dependency resolution) before
-	// platform_sync (platform steps) in both documents.
+	// platform_sync (platform steps) in both documents. The search is
+	// scoped to the activation section of each document ("## Activation"
+	// heading) — a bare whole-document index would false-fail on a phase
+	// name mentioned in a table of contents or a note, and false-pass if
+	// a phase appeared only in an unrelated section — and compares the
+	// command-string positions ("flutter pub get" before "pod install",
+	// the manifest command surface derived from the phase table) rather
+	// than the short phase names.
 	for name, doc := range map[string]string{"lifecycle/README.md": lifecycle, "docs/flutter-lifecycle.md": docs} {
-		first, second := strings.Index(doc, declared[0]), strings.Index(doc, declared[1])
+		activation := activationSection(t, name, doc)
+		first, second := strings.Index(activation, declared[0]), strings.Index(activation, declared[1])
 		if first == -1 || second == -1 || first > second {
-			t.Errorf("%s does not list the activation phases in declared order (%s before %s)", name, declared[0], declared[1])
+			t.Errorf("%s activation section does not list the phases in declared order (%s before %s)", name, declared[0], declared[1])
+		}
+		pubGetCmd, podCmd := commands.ActivationCommands[0], commands.ActivationCommands[1]
+		pubGetPos, podPos := strings.Index(activation, pubGetCmd), strings.Index(activation, podCmd)
+		if pubGetPos == -1 || podPos == -1 || pubGetPos > podPos {
+			t.Errorf("%s activation section does not declare the command order (%q before %q)", name, pubGetCmd, podCmd)
 		}
 	}
 
@@ -105,7 +137,6 @@ func TestLifecycleContent_DeclaresActivationPhasesAndRollback(t *testing.T) {
 	// The manifest command strings derived from the phase table must be
 	// what the documents declare (ADR-017): activation "flutter pub
 	// get" then "pod install", rollback "flutter pub get" only.
-	commands := flutter.ManifestCommands()
 	for _, cmd := range commands.ActivationCommands {
 		if !strings.Contains(lifecycle, cmd) {
 			t.Errorf("lifecycle/README.md does not declare the activation command %q (derived from the phase table)", cmd)
@@ -178,8 +209,20 @@ func TestManifestPart_MirrorsCapabilityDeclaration(t *testing.T) {
 	if missing := containsAll(manifestDoc, declaration.ActivationPhases...); len(missing) > 0 {
 		t.Errorf("standard/README.md does not declare activation phase(s) %v", missing)
 	}
-	if missing := containsAll(manifestDoc, declaration.BuildPhases...); len(missing) > 0 {
-		t.Errorf("standard/README.md does not declare build phase(s) %v", missing)
+
+	// Build phases asserted by their full command strings, not the bare
+	// target names: the three-char names ("web", "apk", "ios") appear in
+	// unrelated contexts, so name-only matching would pass even if the
+	// build-phase declaration were removed. The command strings are the
+	// executable build surface (build.go — the single source of build
+	// knowledge); the Manifest part must declare them.
+	for _, cmd := range []string{"flutter build web", "flutter build apk --release", "flutter build ios --release"} {
+		if !strings.Contains(manifestDoc, cmd) {
+			t.Errorf("standard/README.md does not declare the build-phase command %q", cmd)
+		}
+	}
+	if len(declaration.BuildPhases) != 3 {
+		t.Errorf("executable build phase declaration = %v, want the three Flutter targets (web, apk, ios)", declaration.BuildPhases)
 	}
 	var checkNames []string
 	for _, check := range declaration.VerificationChecks {
@@ -261,10 +304,16 @@ func TestMaintainer_DeclaredAndAccountable(t *testing.T) {
 	root := repoRoot(t)
 	manifestDoc := readPart(t, root, filepath.Join("standard", "README.md"))
 
-	if !regexp.MustCompile(`(?m)^## Maintainer`).MatchString(manifestDoc) {
-		t.Error("standard/README.md has no Maintainer section — the ADR-027 maintainership bar requires a declared maintainer")
+	// Scope every assertion to the Maintainer section itself: a
+	// whole-document search would be satisfied by the repository or
+	// identity wording appearing elsewhere (e.g. "anvil-standard-flutter"
+	// in the Identity table), even if the Maintainer section were empty.
+	loc := regexp.MustCompile(`(?m)^## Maintainer`).FindStringIndex(manifestDoc)
+	if loc == nil {
+		t.Fatal("standard/README.md has no Maintainer section — the ADR-027 maintainership bar requires a declared maintainer")
 	}
-	if missing := containsAll(manifestDoc, "Maleo Labs", "accountable", "anvil-standard-flutter"); len(missing) > 0 {
-		t.Errorf("standard/README.md Maintainer section misses %v — the maintainer must be declared, accountable, and reachable through this standard's repository", missing)
+	maintainer := manifestDoc[loc[0]:]
+	if missing := containsAll(maintainer, "Maleo Labs", "accountable", "anvil-standard-flutter", "engineering@maleolabs.com"); len(missing) > 0 {
+		t.Errorf("standard/README.md Maintainer section misses %v — the maintainer must be declared, accountable, reachable through an org contact channel, and tied to this standard's repository", missing)
 	}
 }
