@@ -8,10 +8,10 @@ irreversible, and how compatibility is validated at adoption. It is the
 adopter-facing entry point of the standard's Documentation part (007 §9).
 
 The standard's executable content enforces what this guide describes
-(manifesto §6 — documentation is a claim, enforcement is a fact): the
-phase table, checks, and validation rules live in the executable and are
-declared in the [Manifest](../standard/README.md); this guide only
-points at them.
+([manifesto §6](https://github.com/maleolabs/forge-anvil-cli/blob/develop/docs/manifesto/ANVIL_MANIFESTO.md)
+— documentation is a claim, enforcement is a fact): the phase table,
+checks, and validation rules live in the executable and are declared in
+the [Manifest](../standard/README.md); this guide only points at them.
 
 > **Terminology.** "Standard" here means the delivery lifecycle standard
 > `anvil-standard-flutter` — the distributable unit of Flutter lifecycle
@@ -111,7 +111,8 @@ The hybrid deployment model (ADR-016) has no server-side install or
 in-place activation: there is no server to initialize and no release to
 register on one. Activation runs the release's dependency set and
 platform steps on the release working directory when the release is
-served (see [Activation](#5-what-activation-runs)).
+served, through the runtime's activation command `anvil deployment
+activate` (TD-006; see [Activation](#5-what-activation-runs)).
 
 Initialization writes the framework declaration (`project.framework:
 flutter`) and, when the standard's record carries config extension

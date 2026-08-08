@@ -50,10 +50,14 @@ deployment model — there is no server to activate on):
 
 ### Build phases
 
-`pub_get`, `web`, `apk`, `ios` — the build pipeline's phases in build
-execution order (`internal/flutter/build.go`): the `dependencies` stage
-(`pub_get`) resolves the package graph, then the build stage runs the
-targets (web → apk → ios) with their ADR-018 platform metadata.
+`web`, `apk`, `ios` — the declared build phases in build execution order
+(`internal/flutter/build.go` — the build target table is the single
+source of the BuildPhases declaration): `flutter build web`,
+`flutter build apk --release`, `flutter build ios --release`, each with
+its ADR-018 platform metadata. Dependency resolution (`flutter pub
+get`) is an **activation phase** (`pub_get`) and the template's
+`dependencies` stage — it is not a declared build phase; see
+Templates below.
 
 ### Verification checks
 
@@ -69,9 +73,11 @@ the `framework.flutter.` namespace (ADR-005 §4.4;
 
 ### Templates
 
-The Flutter build pipeline definition (`build.yaml` — dependencies +
-build stages) and the generic CI scaffold (`ci.yaml`), returned through
-the `template` command ([templates/README.md](../templates/README.md)).
+The Flutter build pipeline definition (`build.yaml` — a `dependencies`
+stage running `flutter pub get`, then the `build` stage with the
+web → apk → ios targets; returned through the `template` command,
+`internal/flutter/template.go`) and the generic CI scaffold
+(`ci.yaml`) ([templates/README.md](../templates/README.md)).
 
 ### Deployment model
 
