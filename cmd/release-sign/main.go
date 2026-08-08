@@ -41,6 +41,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"maleolabs.com/anvil-standard-flutter/internal/release"
 )
@@ -120,6 +121,8 @@ func runSign(args []string) int {
 	archive := fs.String("archive", "", "path of the packaged release archive (the release content)")
 	location := fs.String("location", "", "https distribution.location of the archive on the release channel")
 	key := fs.String("key", "", "path of the Ed25519 signing private key (PEM PKCS#8)")
+	binaries := fs.String("binaries", "", "path of the platform binaries staging directory (binaries/); every regular file becomes a named attestation-bound contentDigests entry (TS-014-04-04)")
+	sig := fs.String("sig", "", "path of the detached document signature asset (registry-metadata-<v>.json.sig): the Ed25519 signature over the raw document bytes, base64 (F-1)")
 	out := fs.String("out", "", "path of the produced registry metadata document (default: stdout)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -155,12 +158,30 @@ func runSign(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-
-	payload, err := release.AttestationPayload(src.ID, *version, []release.ContentDigest{{
+	// The digest set: the release-content digest first (unnamed), then
+	// the named digests of the binary assets (TS-014-04-04) — sorted by
+	// file name, so the array order is deterministic. The attestation
+	// payload concatenates the digests in array order, so the order is
+	// signed material.
+	contentDigests := []release.ContentDigest{{
 		Algorithm: release.DigestAlgorithmSHA256,
 		Encoding:  release.DigestEncodingBase16,
 		Digest:    digest,
-	}})
+	}}
+	if *binaries != "" {
+		binDigests, err := release.BinaryAssetDigests(*binaries)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if len(binDigests) == 0 {
+			fmt.Fprintf(os.Stderr, "error: --binaries %s contains no files — a release attests its binary assets or none at all\n", *binaries)
+			return 1
+		}
+		contentDigests = append(contentDigests, binDigests...)
+	}
+
+	payload, err := release.AttestationPayload(src.ID, *version, contentDigests)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
@@ -168,13 +189,28 @@ func runSign(args []string) int {
 	signature := release.SignAttestation(payload, priv)
 	publicKey := release.PublicKeyBase64(priv)
 
-	doc := release.DeriveDocument(src, *version, *location, digest, signature, publicKey)
+	doc := release.DeriveDocument(src, *version, *location, contentDigests, signature, publicKey)
 	// Self-parse guard: never write a document the strict registry parser
 	// would reject (TS-016-03-02 review finding; the release pipeline never
 	// publishes material it cannot verify).
 	if err := release.ValidateDocumentShape(doc); err != nil {
 		fmt.Fprintf(os.Stderr, "error: derived document failed the self-parse guard: %v\n", err)
 		return 1
+	}
+	// The detached document signature (F-1) covers the EXACT bytes that
+	// are written to the release asset — the same bytes the bootstrap
+	// installer (install.sh) verifies with its pinned publisher key.
+	docBytes, err := release.DocumentBytes(doc)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if *sig != "" {
+		sigB64 := release.SignDocumentBytes(docBytes, priv)
+		if err := os.WriteFile(*sig, []byte(sigB64+"\n"), 0o644); err != nil {
+			fmt.Fprintf(os.Stderr, "error: write detached signature %s: %v\n", *sig, err)
+			return 1
+		}
 	}
 	if *out == "" {
 		if err := release.WriteDocument(doc, "/dev/stdout"); err != nil {
@@ -187,7 +223,8 @@ func runSign(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	fmt.Printf("wrote %s (id %s, version %s, digest %s)\n", *out, doc.ID, doc.Version, digest)
+	fmt.Printf("wrote %s (id %s, version %s, %d content digest(s), %d named binary digest(s))\n",
+		*out, doc.ID, doc.Version, len(contentDigests)-len(binDigestsFor(doc)), len(binDigestsFor(doc)))
 	fmt.Printf("public key (base64): %s\n", publicKey)
 	return 0
 }
@@ -196,6 +233,8 @@ func runVerify(args []string) int {
 	fs := flag.NewFlagSet("verify", flag.ExitOnError)
 	document := fs.String("document", "", "path of the produced registry metadata document")
 	archive := fs.String("archive", "", "path of the release archive (the release content)")
+	binaries := fs.String("binaries", "", "path of the platform binaries staging directory (binaries/); every binary asset is verified against its declared named digest (TS-014-04-04)")
+	sig := fs.String("sig", "", "path of the detached document signature asset (registry-metadata-<v>.json.sig); the signature is verified over the RAW document bytes with the document's declared public key (F-1)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -218,9 +257,46 @@ func runVerify(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: verification failed: %v\n", err)
 		return 1
 	}
+	if *binaries != "" {
+		if err := release.VerifyBinaryAssetDigests(doc, *binaries); err != nil {
+			fmt.Fprintf(os.Stderr, "error: binary asset verification failed: %v\n", err)
+			return 1
+		}
+	}
+	if *sig != "" {
+		// The detached signature covers the RAW bytes of the document
+		// asset — verify against the file bytes, not the parsed doc.
+		raw, err := os.ReadFile(*document)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: read %s: %v\n", *document, err)
+			return 1
+		}
+		sigRaw, err := os.ReadFile(*sig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: read detached signature %s: %v\n", *sig, err)
+			return 1
+		}
+		sigB64 := strings.TrimSpace(string(sigRaw))
+		if err := release.VerifyDocumentSignature(raw, sigB64, doc.Trust.Attestation.PublicKey); err != nil {
+			fmt.Fprintf(os.Stderr, "error: detached document signature verification failed: %v\n", err)
+			return 1
+		}
+	}
 	fmt.Printf("OK: %s %s — integrity (sha-256 %s) and attestation (ed25519) verified\n",
 		doc.ID, doc.Version, doc.Trust.ContentDigests[0].Digest)
 	return 0
+}
+
+// binDigestsFor returns the named (asset-bound) digest entries of a
+// document — the count the sign summary reports.
+func binDigestsFor(doc *release.MetadataDocument) []release.ContentDigest {
+	var named []release.ContentDigest
+	for _, d := range doc.Trust.ContentDigests {
+		if d.Name != "" {
+			named = append(named, d)
+		}
+	}
+	return named
 }
 
 // plainSemver reports whether v is plain semver without leading zeros
