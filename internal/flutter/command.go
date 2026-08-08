@@ -18,17 +18,17 @@
 //
 // The dispatcher implements the commands of this batch plus the
 // registration scaffold — `capabilities`, `extension`, `verify`,
-// `validate`, `build`, `template`, and `manifest`. The `verify` command
-// runs the Flutter verification checks (TS-P7-25) and the `validate`
-// command validates Flutter config extension values (TS-P7-26). The
-// `template` command returns the adapter-owned pipeline definitions
-// (TS-007-038, ADR-020 §1). The `activate` command is intentionally
-// absent: the hybrid deployment model has no server activation (TS-P7-20
-// AC-5, EPIC-007 §7.3) — invoking it reports an unknown command
-// (ErrUnknownCommand, exit 2). The `manifest` command exists for
-// contract symmetry and returns an empty result: the hybrid model has no
-// activation/rollback commands to store in the artifact manifest
-// (TS-P7-15, TS-P7-16).
+// `validate`, `build`, `activate`, `template`, and `manifest`. The
+// `verify` command runs the Flutter verification checks (TS-P7-25) and
+// the `validate` command validates Flutter config extension values
+// (TS-P7-26). The `activate` command runs the hybrid deployment model's
+// activation phase operations (TS-018-02-01): the Core invokes it with
+// an ActivationRequest payload and receives the ActivationResult for one
+// declared phase operation (pub_get, platform_sync — activate or
+// rollback). The `template` command returns the adapter-owned pipeline
+// definitions (TS-007-038, ADR-020 §1). The `manifest` command returns
+// the activation and rollback command strings the hybrid model stores in
+// the artifact manifest (TS-018-02-01, TS-P7-15, TS-P7-16).
 package flutter
 
 import (
@@ -59,9 +59,10 @@ const (
 )
 
 // Adapter is the Flutter adapter executable's command surface. It holds
-// the injectable command runner used by the build pipeline.
+// the injectable command runners used by the build and activation
+// pipelines.
 //
-// Reference: TS-P7-20, TS-P7-21, 004-review-resolutions D1
+// Reference: TS-P7-20, TS-P7-21, TS-018-02-01, 004-review-resolutions D1
 type Adapter struct {
 	// buildRunner executes the build targets (`flutter build ...`). A
 	// nil buildRunner means each target uses its production runner from
@@ -69,12 +70,27 @@ type Adapter struct {
 	// the build pipeline without the Flutter toolchain on the host
 	// (TS-P7-21).
 	buildRunner commandRunner
+
+	// activationRunner executes the flutter program activation phases
+	// (`flutter pub get` — pub_get). A nil activationRunner means the
+	// phase uses its production runner (runFlutter); tests set it to a
+	// fake to execute the activation pipeline without the Flutter
+	// toolchain on the host (TS-018-02-01).
+	activationRunner commandRunner
+
+	// podRunner executes the pod program activation phases
+	// (`pod install` — platform_sync). A nil podRunner means the phase
+	// uses its production runner (runPod); tests set it to a fake to
+	// execute the platform step without CocoaPods on the host
+	// (TS-018-02-01).
+	podRunner commandRunner
 }
 
-// New returns an Adapter with the production build runner left nil, so
-// build targets use runFlutter from the build table. Tests construct
-// &Adapter{buildRunner: f} to execute targets without the Flutter
-// toolchain on the host.
+// New returns an Adapter with the production runners left nil, so build
+// targets use runFlutter and activation phases use their production
+// runners (runFlutter, runPod). Tests construct &Adapter{buildRunner: f,
+// activationRunner: f, podRunner: f} to execute the pipelines without
+// the Flutter toolchain or CocoaPods on the host.
 func New() *Adapter {
 	return &Adapter{}
 }
@@ -165,6 +181,13 @@ func (a *Adapter) handle(ctx context.Context, command string, payload []byte) (a
 		}
 		return RunBuild(ctx, a.buildRunner, req), nil
 
+	case contracts.CommandActivation:
+		var req contracts.ActivationRequest
+		if err := parsePayload(command, payload, &req); err != nil {
+			return nil, err
+		}
+		return RunActivation(ctx, a.activationRunner, a.podRunner, req), nil
+
 	case contracts.CommandTemplate:
 		var req contracts.TemplateRequest
 		if err := parsePayload(command, payload, &req); err != nil {
@@ -173,12 +196,15 @@ func (a *Adapter) handle(ctx context.Context, command string, payload []byte) (a
 		return Template(), nil
 
 	case contracts.CommandManifest:
-		// The hybrid deployment model has no server activation
-		// (TS-P7-20 AC-5, ADR-016), so there are no activation or
-		// rollback command strings to store in the artifact manifest
-		// (005-adapter-command-contract §10.10). Return the empty result;
-		// the packaging layer omits the empty slices from the manifest.
-		return contracts.ManifestCommandResult{}, nil
+		// The hybrid deployment model's activation and rollback command
+		// strings are stored in the artifact manifest at packaging time
+		// (ADR-017, TS-018-02-01). The strings derive from the declared
+		// activation phase table: activation runs `flutter pub get`
+		// then `pod install` (platform step, conditional on the ios/
+		// directory and macOS host); rollback re-runs `flutter pub get`
+		// (the only reversible phase — platform_sync is irreversible
+		// and reverse nothing).
+		return ManifestCommands(), nil
 
 	default:
 		return nil, fmt.Errorf("%w %q", ErrUnknownCommand, command)
