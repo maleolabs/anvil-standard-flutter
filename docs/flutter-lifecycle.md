@@ -69,6 +69,11 @@ Platform-aware execution (ADR-018): an unsupported target is skipped
 with a warning; `--target <name>` selects a single target; `--strict`
 fails unsupported targets instead of skipping.
 
+The build pipeline template (see Templates below) covers the full build
+step sequence: a `dependencies` stage runs `flutter pub get` — resolving
+the package graph before any build — followed by the `build` stage with
+the targets above.
+
 ## Verification
 
 `anvil artifact verify` runs the standard's structural checks against
@@ -84,14 +89,25 @@ The standard declares two configuration keys under the
 validated by the standard's `validate` command:
 
 - `framework.flutter.targets` — comma-separated build targets
-  (default `web,apk`; known targets `web`, `apk`, `ios`)
+  (default `web,apk`; known targets `web`, `apk`, `ios`; duplicates
+  rejected — each target is executed once)
 - `framework.flutter.build_args` — optional extra `flutter build`
   arguments (whitespace-separated, no shell metacharacters)
 
 ## Templates
 
-At init, the standard supplies `.anvil/pipelines/build.yaml` (the build
-pipeline above) and `.anvil/pipelines/ci.yaml` (a generic CI scaffold).
+At init, the standard supplies `.anvil/pipelines/build.yaml` and
+`.anvil/pipelines/ci.yaml`:
+
+- `build.yaml` — the build pipeline: a `dependencies` stage running
+  `flutter pub get`, then a `build` stage with the targets above in
+  order (web → apk → ios), each carrying its ADR-018 platform metadata
+  and the explicit timeouts (10m web, 15m apk) Flutter builds need.
+- `ci.yaml` — a generic CI scaffold (build + test placeholder stages).
+
+Template freshness — reviewing the template when the Flutter framework
+updates — is a standard maintenance responsibility; the review log lives
+in [`templates/README.md`](../templates/README.md).
 
 ## Adopting this standard
 

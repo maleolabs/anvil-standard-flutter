@@ -95,8 +95,9 @@ func TestValidateConfigValues_Empty(t *testing.T) {
 // TestValidateConfigValues_Invalid verifies the validation rules for each
 // Flutter value: targets must be a non-empty comma-separated list of
 // known target names (empty tokens are malformed, unknown names are
-// rejected), build_args must be a safe argument string when present, and
-// unknown keys are rejected (TS-P7-26 AC-3).
+// rejected, duplicates are rejected), build_args must be a safe argument
+// string when present, and unknown keys are rejected (TS-P7-26 AC-3;
+// TS-018-02-02).
 func TestValidateConfigValues_Invalid(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -137,6 +138,16 @@ func TestValidateConfigValues_Invalid(t *testing.T) {
 			name:       "targets_whitespace_token",
 			value:      contracts.ConfigValue{Key: KeyTargets, Value: "web, apk"},
 			wantDetail: "not a known Flutter target",
+		},
+		{
+			name:       "targets_duplicate",
+			value:      contracts.ConfigValue{Key: KeyTargets, Value: "web,web"},
+			wantDetail: "duplicate target",
+		},
+		{
+			name:       "targets_duplicate_inline",
+			value:      contracts.ConfigValue{Key: KeyTargets, Value: "web,apk,web"},
+			wantDetail: "duplicate target",
 		},
 		{
 			name:       "build_args_semicolon",

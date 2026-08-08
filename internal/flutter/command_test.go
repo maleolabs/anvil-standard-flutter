@@ -396,7 +396,9 @@ func TestRun_Manifest(t *testing.T) {
 
 // TestRun_Template verifies the template command prints the adapter-owned
 // pipeline definitions (build + ci) as valid JSON and exits 0 (TS-007-038,
-// ADR-020 §1).
+// TS-018-02-02, ADR-020 §1). The build definition covers the Flutter
+// hybrid build steps: the dependencies stage (`flutter pub get`) and the
+// build stage with the target tasks.
 func TestRun_Template(t *testing.T) {
 	code, stdout, stderr := runDispatch(t, nil,
 		contracts.CommandTemplate, `{"framework":"flutter"}`)
@@ -413,12 +415,15 @@ func TestRun_Template(t *testing.T) {
 	if result.Build.Pipeline.Name != "build" {
 		t.Errorf("Build.Pipeline.Name = %q, want %q", result.Build.Pipeline.Name, "build")
 	}
-	if len(result.Build.Pipeline.Stages) != 1 {
-		t.Fatalf("Build stages = %d, want 1", len(result.Build.Pipeline.Stages))
+	if len(result.Build.Pipeline.Stages) != 2 {
+		t.Fatalf("Build stages = %d, want 2 (dependencies, build)", len(result.Build.Pipeline.Stages))
 	}
-	tasks := result.Build.Pipeline.Stages[0].Tasks
+	if result.Build.Pipeline.Stages[0].Name != "dependencies" {
+		t.Errorf("Build stage[0].Name = %q, want %q", result.Build.Pipeline.Stages[0].Name, "dependencies")
+	}
+	tasks := result.Build.Pipeline.Stages[1].Tasks
 	if len(tasks) != 3 {
-		t.Fatalf("Build tasks = %d, want 3 (web, apk, ios)", len(tasks))
+		t.Fatalf("Build stage tasks = %d, want 3 (web, apk, ios)", len(tasks))
 	}
 	// The template must preserve the ADR-018 platform metadata.
 	for _, task := range tasks {
@@ -442,9 +447,11 @@ func TestRun_Template(t *testing.T) {
 }
 
 // TestRun_TemplateBuildMatchesBuildTargets verifies the single-source
-// requirement (TS-007-038): the template's tasks mirror the commands of
-// the adapter's build target table — the same framework knowledge must
-// not drift between the template and the executed build phases.
+// requirement (TS-007-038): the template's build stage tasks mirror the
+// commands of the adapter's build target table — the same framework
+// knowledge must not drift between the template and the executed build
+// phases. (The dependencies stage is not a build target; the single-source
+// invariant applies to the build stage.)
 func TestRun_TemplateBuildMatchesBuildTargets(t *testing.T) {
 	code, stdout, stderr := runDispatch(t, nil,
 		contracts.CommandTemplate, `{"framework":"flutter"}`)
@@ -455,9 +462,9 @@ func TestRun_TemplateBuildMatchesBuildTargets(t *testing.T) {
 	var result contracts.TemplateResult
 	decodeStdout(t, stdout, &result)
 
-	tasks := result.Build.Pipeline.Stages[0].Tasks
+	tasks := result.Build.Pipeline.Stages[1].Tasks
 	if len(tasks) != len(buildTargets) {
-		t.Fatalf("template tasks = %d, want %d", len(tasks), len(buildTargets))
+		t.Fatalf("template build stage tasks = %d, want %d", len(tasks), len(buildTargets))
 	}
 	for i, target := range buildTargets {
 		task := tasks[i]

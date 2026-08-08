@@ -73,10 +73,11 @@ func ConfigExtension() contracts.ConfigExtensionResult {
 
 // ValidateConfigValues validates extended configuration values against
 // the Flutter adapter's rules (TS-P7-26 AC-3): the targets must be a
-// non-empty comma-separated list of known target names, and build_args
-// must be a safe argument string when present. Unknown keys are rejected.
-// The Core enforces namespace isolation before values reach the adapter
-// (TS-P7-03 AC-4); the adapter validates the values themselves.
+// non-empty comma-separated list of known target names without
+// duplicates, and build_args must be a safe argument string when present.
+// Unknown keys are rejected. The Core enforces namespace isolation before
+// values reach the adapter (TS-P7-03 AC-4); the adapter validates the
+// values themselves.
 //
 // Reference: TS-P7-26 AC-3, TS-P7-03 AC-4
 func ValidateConfigValues(req contracts.ConfigValidationRequest) contracts.ConfigValidationResult {
@@ -107,13 +108,17 @@ func validateConfigValue(value contracts.ConfigValue) error {
 // validateTargets enforces the targets rule: the value must be a
 // non-empty comma-separated list of known Flutter target names (web, apk,
 // ios). Empty tokens — from lists like ",web", "web," or "web,,apk" —
-// are rejected as malformed, and unknown names are rejected outright.
+// are rejected as malformed, unknown names are rejected outright, and a
+// target listed more than once (e.g. "web,web") is rejected as a
+// duplicate: the build pipeline executes each listed target once, in
+// table order, so duplicates can only waste a rebuild (TS-018-02-02).
 // Tokens are not trimmed: a token like " apk" is not a known target and
 // is rejected, keeping the rule deterministic.
 func validateTargets(value string) error {
 	if value == "" {
 		return fmt.Errorf("%s: must not be empty (comma-separated known targets, e.g. \"web,apk\")", KeyTargets)
 	}
+	seen := make(map[string]bool, len(knownTargets))
 	for _, token := range strings.Split(value, ",") {
 		if token == "" {
 			return fmt.Errorf(
@@ -127,6 +132,13 @@ func validateTargets(value string) error {
 				KeyTargets, token, strings.Join(knownTargets, ", "),
 			)
 		}
+		if seen[token] {
+			return fmt.Errorf(
+				"%s: %q is not a valid target list: duplicate target %q (each known target is executed once, in table order)",
+				KeyTargets, value, token,
+			)
+		}
+		seen[token] = true
 	}
 	return nil
 }
