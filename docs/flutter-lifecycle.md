@@ -76,11 +76,28 @@ the targets above.
 
 ## Verification
 
-`anvil artifact verify` runs the standard's structural checks against
-the packaged artifact:
+`anvil artifact verify` runs the standard's checks against the packaged
+artifact: the structural checks (the preserved v1.x surface) and the
+lifecycle-conformity checks of the hybrid model (TS-018-03-02):
 
-- `pubspec_yaml` — `pubspec.yaml` exists in the artifact root
-- `lib_directory` — `lib/` exists in the artifact
+- Structural checks:
+  - `pubspec_yaml` — `pubspec.yaml` exists in the artifact root
+  - `lib_directory` — `lib/` exists in the artifact
+- Lifecycle-conformity checks:
+  - `dependency_lockfile` — the release's locked dependency set is wired:
+    `pubspec.lock` present so activation re-resolves the built set
+  - `dependency_timing` — the manifest and locked set are present and the
+    locked set covers the declared dependencies, so dependency resolution
+    can run at the declared timing (before promotion)
+  - `platform_sync_ready` — an `ios/` directory carries `ios/Podfile`,
+    the platform step's input (no `ios/` → informational no-op, nothing
+    to verify)
+  - `rollback_behavior` — per-phase rollback coverage and manifest
+    rollback metadata matching the phase table
+
+The queue-restart item of the server model does not apply to the hybrid
+model: Flutter releases hold no server-side queue, so there is nothing
+to restart.
 
 ## Configuration
 

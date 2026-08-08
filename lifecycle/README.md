@@ -101,7 +101,7 @@ irreversible phases reverse nothing.
 |---|---|
 | Activation | The hybrid model's declared activation phases: `pub_get` (dependency resolution, before promotion) and `platform_sync` (platform steps, after), with per-phase failure and rollback semantics |
 | Build | `flutter build web`, `flutter build apk --release`, `flutter build ios --release` in declared order (web → apk → ios), with platform metadata (ios is darwin-only) |
-| Verification | Structural checks of the built artifact: `pubspec.yaml` present, `lib/` directory present |
+| Verification | Structural checks of the built artifact (`pubspec.yaml` present, `lib/` directory present) plus lifecycle-conformity checks of the hybrid model (TS-018-03-02): shared-resource wiring (`dependency_lockfile`), dependency-resolution timing (`dependency_timing`), platform step readiness (`platform_sync_ready`), rollback behavior (`rollback_behavior`) |
 | Configuration | `framework.flutter.*` keys (targets, build_args) with value validation |
 | Templates | The build and CI pipeline definitions generated at project init |
 

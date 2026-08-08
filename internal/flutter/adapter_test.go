@@ -66,17 +66,27 @@ func TestCapabilities_DeclaresBuildPhases(t *testing.T) {
 }
 
 // TestCapabilities_DeclaresVerificationChecks verifies that the
-// declaration lists the two Flutter verification checks — pubspec_yaml
-// and lib_directory (TS-P7-25) — and no diagnostic commands.
+// declaration lists the six Flutter verification checks — the two
+// structural checks pubspec_yaml and lib_directory (TS-P7-25) plus the
+// four lifecycle-conformity checks dependency_lockfile,
+// dependency_timing, platform_sync_ready, and rollback_behavior
+// (TS-018-03-02) — and no diagnostic commands.
 //
-// Reference: TS-P7-20, TS-P7-25
+// Reference: TS-P7-20, TS-P7-25, TS-018-03-02
 func TestCapabilities_DeclaresVerificationChecks(t *testing.T) {
 	result := Capabilities()
 	checks := result.Declaration.VerificationChecks
-	if len(checks) != 2 {
-		t.Errorf("VerificationChecks = %v, want the two TS-P7-25 checks (pubspec_yaml, lib_directory)", checks)
+	if len(checks) != 6 {
+		t.Errorf("VerificationChecks = %v, want the two TS-P7-25 structural checks (pubspec_yaml, lib_directory) plus the four TS-018-03-02 lifecycle-conformity checks", checks)
 	}
-	for i, want := range []string{CheckPubspecYaml, CheckLibDirectory} {
+	for i, want := range []string{
+		CheckPubspecYaml,
+		CheckLibDirectory,
+		CheckDependencyLockfile,
+		CheckDependencyTiming,
+		CheckPlatformSyncReady,
+		CheckRollbackBehavior,
+	} {
 		if checks[i].Name != want {
 			t.Errorf("VerificationChecks[%d].Name = %q, want %q", i, checks[i].Name, want)
 		}

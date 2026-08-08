@@ -64,6 +64,22 @@ func Capabilities() contracts.CapabilityResult {
 					Name:        CheckLibDirectory,
 					Description: "validates that the lib/ directory exists in the artifact",
 				},
+				{
+					Name:        CheckDependencyLockfile,
+					Description: "validates that the release's locked dependency set is wired: pubspec.lock present so activation re-resolves the built set (lifecycle-conformity, TS-018-03-02)",
+				},
+				{
+					Name:        CheckDependencyTiming,
+					Description: "validates re-checkable evidence that dependency resolution can run at the declared pre-promotion timing: manifest and locked set present, locked set covers the declared dependencies (lifecycle-conformity, TS-018-03-02)",
+				},
+				{
+					Name:        CheckPlatformSyncReady,
+					Description: "validates the platform step at its declared lifecycle point: ios/ directory present carries ios/Podfile, the platform_sync input (lifecycle-conformity, TS-018-03-02)",
+				},
+				{
+					Name:        CheckRollbackBehavior,
+					Description: "validates that rollback produces the declared state: per-phase rollback coverage and manifest rollback metadata matching the phase table (lifecycle-conformity, TS-018-03-02)",
+				},
 			},
 		},
 	}
