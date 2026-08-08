@@ -101,7 +101,8 @@ with a `-test`/`-pre` suffix create GitHub pre-releases (e.g.
 
 ## Documentation
 
-- [Adopter documentation](docs/flutter-lifecycle.md) — the Flutter lifecycle for adopters
+- [Adoption guide](docs/adopt.md) — how a Flutter project adopts the lifecycle and what it does (007 §9)
+- [Flutter lifecycle documentation](docs/flutter-lifecycle.md) — the Flutter lifecycle for adopters
 - [Lifecycle Definition](lifecycle/) — activation and rollback semantics
 - [Verification](verification/) — the Flutter structural checks
 - [Templates](templates/) — build pipeline and configuration extension content
