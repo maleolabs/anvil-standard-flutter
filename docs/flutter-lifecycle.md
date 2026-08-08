@@ -19,14 +19,40 @@ contract.
 
 Flutter releases use the **hybrid deployment model** (ADR-016): releases
 are **built and packaged for distribution** (web, APK, iOS) — they are
-not deployed to a server and activated in place. Consequences:
+not deployed to a server and activated in place. Activation reflects
+this model: the release's dependency set and platform steps run at
+activation time on the release working directory; deployment means
+distributing the packaged artifact (web bundle, APK, iOS app).
 
-- No server activation phases; the `activate` command is intentionally
-  unsupported (unknown command, exit 2).
-- No rollback phases; the artifact manifest carries no
-  activation/rollback command strings.
-- Deployment means distributing the packaged artifact (web bundle, APK,
-  iOS app).
+## Activation
+
+`anvil release activate` (or the runtime's activation phase sequence)
+runs the standard's declared activation phases in declared order from
+the release working directory:
+
+| # | Phase | Command | Reversible |
+|---|---|---|---|
+| 1 | `pub_get` | `flutter pub get` | ✅ rollback: `flutter pub get` (idempotent re-resolution from the lockfile) |
+| 2 | `platform_sync` | `pod install` (iOS platform steps; conditional) | ❌ irreversible |
+
+- **`pub_get`** resolves the release's locked dependency set **before
+  promotion** — the release serves exactly what its `pubspec.lock`
+  declares. A failing resolution fails activation (an unresolvable
+  dependency set cannot serve).
+- **`platform_sync`** runs the native platform steps after dependency
+  resolution. It applies when the release contains an `ios/` directory
+  and the host is macOS (CocoaPods is a macOS tool); otherwise it is an
+  informational no-op — platform-aware execution mirroring the build
+  side (ADR-018). A failing platform step fails activation.
+- **Rollback:** `pub_get` rollback re-runs `flutter pub get` in the
+  restored release's working directory. `platform_sync` is
+  **irreversible** — rollback reports an informational success and
+  never blocks the rollback; the previous release's own activation
+  re-runs its platform steps.
+
+The manifest metadata surface carries the activation command strings
+(`flutter pub get`, `pod install`) and the rollback command string
+(`flutter pub get`).
 
 ## Build targets
 
