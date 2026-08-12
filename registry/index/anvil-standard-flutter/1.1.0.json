@@ -1,0 +1,69 @@
+{
+  "$schema": "urn:anvil:spec:registry-metadata:1.0.0",
+  "title": "Flutter Delivery Lifecycle Standard",
+  "description": "The Flutter delivery lifecycle standard for the Anvil Runtime: Flutter lifecycle content for the hybrid deployment model — build targets (web, apk, ios), structural verification checks, configuration extension, and pipeline templates — exchanged over the standard command contract.",
+  "id": "anvil-standard-flutter",
+  "version": "1.1.0",
+  "contractVersion": "1.0.0",
+  "capability": {
+    "frameworkVersion": [
+      "3.0.0",
+      "3.3.0",
+      "3.7.0",
+      "3.10.0",
+      "3.13.0",
+      "3.16.0",
+      "3.19.0",
+      "3.22.0",
+      "3.24.0",
+      "3.27.0",
+      "3.29.0",
+      "3.32.0"
+    ]
+  },
+  "distribution": {
+    "type": "github-releases",
+    "location": "https://github.com/maleolabs/anvil-standard-flutter/releases/download/v1.1.0/anvil-standard-flutter-1.1.0.tar.gz"
+  },
+  "lifecycle": {
+    "state": "published"
+  },
+  "trust": {
+    "contentDigests": [
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "deaa299df75cf999d943cce735c367d6ef7060a035c338e09b832db7a63d043e"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "5ad02160342c7cca053eb34908f54414808127576f004bd2fcdfc819d5d10ec5",
+        "name": "anvil-adapter-flutter-darwin-amd64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "b392282d16f9957174c94719c07164f31f39617c5bceeebafa4198f4efdd4976",
+        "name": "anvil-adapter-flutter-darwin-arm64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "7edda513cab418875d7257c3409f1e08019e7495794a4766a440bb33ed503120",
+        "name": "anvil-adapter-flutter-linux-amd64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "d61905d82202d61be411ce91175fd4451c4213a7a4bc53c4b2d509d39814a1e0",
+        "name": "anvil-adapter-flutter-linux-arm64"
+      }
+    ],
+    "attestation": {
+      "algorithm": "ed25519",
+      "signature": "TyGJF9EVpLplh0+Ny9uEsunwJaY+ebxcqPJ8sXf9LRXC2Y/4Ut+VWh7bUJxyZDwocf6RRtzzYTOrUL7jsr6sAQ==",
+      "publicKey": "bks0Dv0jHIg2mXPsEJO+cTzeEbIAvpEs9rfeS1JgGGc="
+    }
+  }
+}
