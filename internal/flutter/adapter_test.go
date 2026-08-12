@@ -1,6 +1,7 @@
 // Tests for the Flutter adapter's declared capabilities (TS-P7-20,
-// TS-P7-21): the deployment model, the absence of activation phases, and
-// the build phases the capability declaration exposes to the Core.
+// TS-P7-21, TS-018-02-01): the deployment model, the hybrid activation
+// phases, and the build phases the capability declaration exposes to the
+// Core.
 package flutter
 
 import (
@@ -35,16 +36,18 @@ func TestCapabilities_DeclaresDeploymentModel(t *testing.T) {
 	}
 }
 
-// TestCapabilities_NoActivationPhases verifies that the declaration
-// lists no activation phases — the hybrid model has no server activation
-// (TS-P7-20 AC-5, EPIC-007 §7.3). The `activate` command is absent from
-// the dispatcher as well (command_test.go).
+// TestCapabilities_DeclaresActivationPhases verifies that the declaration
+// lists the hybrid model's activation phases in declared order — pub_get
+// (dependency resolution) then platform_sync (platform steps) — mirroring
+// the activation phase table exactly (TS-018-02-01, TS-P7-20 AC-4).
+// The `activate` command is dispatched for these phases (command_test.go).
 //
-// Reference: TS-P7-20 AC-5
-func TestCapabilities_NoActivationPhases(t *testing.T) {
+// Reference: TS-018-02-01, TS-P7-20 AC-4
+func TestCapabilities_DeclaresActivationPhases(t *testing.T) {
 	result := Capabilities()
-	if len(result.Declaration.ActivationPhases) != 0 {
-		t.Errorf("ActivationPhases = %v, want none for the hybrid model", result.Declaration.ActivationPhases)
+	want := []string{PhasePubGet, PhasePlatformSync}
+	if !reflect.DeepEqual(result.Declaration.ActivationPhases, want) {
+		t.Errorf("ActivationPhases = %v, want %v (declared order)", result.Declaration.ActivationPhases, want)
 	}
 }
 
@@ -63,17 +66,27 @@ func TestCapabilities_DeclaresBuildPhases(t *testing.T) {
 }
 
 // TestCapabilities_DeclaresVerificationChecks verifies that the
-// declaration lists the two Flutter verification checks — pubspec_yaml
-// and lib_directory (TS-P7-25) — and no diagnostic commands.
+// declaration lists the six Flutter verification checks — the two
+// structural checks pubspec_yaml and lib_directory (TS-P7-25) plus the
+// four lifecycle-conformity checks dependency_lockfile,
+// dependency_timing, platform_sync_ready, and rollback_behavior
+// (TS-018-03-02) — and no diagnostic commands.
 //
-// Reference: TS-P7-20, TS-P7-25
+// Reference: TS-P7-20, TS-P7-25, TS-018-03-02
 func TestCapabilities_DeclaresVerificationChecks(t *testing.T) {
 	result := Capabilities()
 	checks := result.Declaration.VerificationChecks
-	if len(checks) != 2 {
-		t.Errorf("VerificationChecks = %v, want the two TS-P7-25 checks (pubspec_yaml, lib_directory)", checks)
+	if len(checks) != 6 {
+		t.Errorf("VerificationChecks = %v, want the two TS-P7-25 structural checks (pubspec_yaml, lib_directory) plus the four TS-018-03-02 lifecycle-conformity checks", checks)
 	}
-	for i, want := range []string{CheckPubspecYaml, CheckLibDirectory} {
+	for i, want := range []string{
+		CheckPubspecYaml,
+		CheckLibDirectory,
+		CheckDependencyLockfile,
+		CheckDependencyTiming,
+		CheckPlatformSyncReady,
+		CheckRollbackBehavior,
+	} {
 		if checks[i].Name != want {
 			t.Errorf("VerificationChecks[%d].Name = %q, want %q", i, checks[i].Name, want)
 		}

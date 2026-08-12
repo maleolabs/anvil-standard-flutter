@@ -33,11 +33,11 @@ A delivery lifecycle standard is conceptually composed of seven parts
 | Tests | [`tests/`](tests/) + the Go test suite under [`internal/`](internal/) |
 
 The standard executable (`cmd/flutter-adapter`) implements the standard
-command contract — `capabilities`, `build`, `verify`, `extension`,
-`validate`, `template`, `manifest` — with the JSON wire shapes defined by
-the delivery lifecycle specification's command contract. The binary name
-convention is `anvil-adapter-<framework>`; the Core resolves this standard
-as `anvil-adapter-flutter`.
+command contract — `capabilities`, `build`, `activate`, `verify`,
+`extension`, `validate`, `template`, `manifest` — with the JSON wire
+shapes defined by the delivery lifecycle specification's command
+contract. The binary name convention is `anvil-adapter-<framework>`;
+the Core resolves this standard as `anvil-adapter-flutter`.
 
 ## Building
 
@@ -101,7 +101,8 @@ with a `-test`/`-pre` suffix create GitHub pre-releases (e.g.
 
 ## Documentation
 
-- [Adopter documentation](docs/flutter-lifecycle.md) — the Flutter lifecycle for adopters
+- [Adoption guide](docs/adopt.md) — how a Flutter project adopts the lifecycle and what it does (007 §9)
+- [Flutter lifecycle documentation](docs/flutter-lifecycle.md) — the Flutter lifecycle for adopters
 - [Lifecycle Definition](lifecycle/) — activation and rollback semantics
 - [Verification](verification/) — the Flutter structural checks
 - [Templates](templates/) — build pipeline and configuration extension content

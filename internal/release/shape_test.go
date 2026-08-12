@@ -180,7 +180,8 @@ func TestSignVerifyRoundtrip_WithShapeGuard(t *testing.T) {
 		&SourceManifest{ID: "anvil-standard-flutter", Version: "1.0.0", ContractVersion: "1.0.0", Capability: Capability{FrameworkVersion: []string{"3.0.0", "3.22.0", "3.32.0"}}},
 		"1.0.0",
 		"https://github.com/maleolabs/anvil-standard-flutter/releases/download/v1.0.0/anvil-standard-flutter-1.0.0.tar.gz",
-		digest, SignAttestation(payload, priv), pubB64,
+		[]ContentDigest{{Algorithm: DigestAlgorithmSHA256, Encoding: DigestEncodingBase16, Digest: digest}},
+		SignAttestation(payload, priv), pubB64,
 	)
 
 	// Shape guard passes on a properly derived document…

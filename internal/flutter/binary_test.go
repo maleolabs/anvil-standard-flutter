@@ -72,9 +72,8 @@ func runBinary(t *testing.T, bin string, args ...string) (int, string, string) {
 }
 
 // TestBinary_EndToEnd verifies the compiled executable: capabilities,
-// extension, and build produce their JSON results with exit 0, activate
-// is rejected (hybrid model — no server activation), and an unknown
-// command exits non-zero.
+// extension, build, and activate produce their JSON results with exit 0,
+// and an unknown command exits non-zero.
 func TestBinary_EndToEnd(t *testing.T) {
 	bin := buildAdapterBinary(t)
 
@@ -90,8 +89,8 @@ func TestBinary_EndToEnd(t *testing.T) {
 		if result.Declaration.DeploymentModel != string(contracts.DeploymentModelHybrid) {
 			t.Errorf("DeploymentModel = %q, want %q", result.Declaration.DeploymentModel, contracts.DeploymentModelHybrid)
 		}
-		if len(result.Declaration.ActivationPhases) != 0 {
-			t.Errorf("ActivationPhases = %v, want none (TS-P7-20 AC-5)", result.Declaration.ActivationPhases)
+		if len(result.Declaration.ActivationPhases) != len(activationPhases) {
+			t.Errorf("ActivationPhases = %v, want the %d TS-018-02-01 phases in declared order", result.Declaration.ActivationPhases, len(activationPhases))
 		}
 		if len(result.Declaration.BuildPhases) != len(buildTargets) {
 			t.Errorf("BuildPhases length = %d, want %d", len(result.Declaration.BuildPhases), len(buildTargets))
@@ -138,13 +137,28 @@ func TestBinary_EndToEnd(t *testing.T) {
 		}
 	})
 
-	t.Run("activate_rejected", func(t *testing.T) {
-		code, stdout, _ := runBinary(t, bin, contracts.CommandActivation, `{}`)
-		if code != ExitUsage {
-			t.Errorf("exit code = %d, want %d — activate is not supported (TS-P7-20 AC-5)", code, ExitUsage)
+	t.Run("activate", func(t *testing.T) {
+		// The activate command runs the declared phase through the
+		// production runners; the working directory is a nonexistent
+		// path with no ios/ directory, so pub_get fails at child
+		// process start — deterministically, without a Flutter
+		// toolchain on the test host. The process still exits 0 with
+		// a valid JSON result — the JSON result is authoritative
+		// (005-adapter-command-contract §7).
+		code, stdout, stderr := runBinary(t, bin, contracts.CommandActivation,
+			`{"phase":"pub_get","operation":"activate","release":{"project_id":"p1","working_dir":"/nonexistent"}}`)
+		if code != ExitOK {
+			t.Fatalf("exit code = %d, want %d (stderr: %s)", code, ExitOK, stderr)
 		}
-		if stdout != "" {
-			t.Errorf("stdout = %q, want empty for a failed dispatch", stdout)
+		var result contracts.ActivationResult
+		if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+			t.Fatalf("stdout %q is not valid JSON: %v", stdout, err)
+		}
+		if result.Success {
+			t.Error("Success = true, want false — the pub_get phase fails without a release working directory")
+		}
+		if result.Error == "" {
+			t.Error("Error = empty, want the phase failure details")
 		}
 	})
 

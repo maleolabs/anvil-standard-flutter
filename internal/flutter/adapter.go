@@ -14,8 +14,10 @@
 // The Flutter adapter is a hybrid deployment model adapter (ADR-016):
 // releases are built and packaged for distribution (web, APK, iOS)
 // rather than deployed to a server and activated in place (EPIC-007
-// §7.3). It therefore declares no activation phases and implements no
-// `activate` command (TS-P7-20 AC-5).
+// §7.3). It declares the activation phases of the hybrid model — the
+// build artifact's dependency set and the platform steps of the native
+// targets (TS-018-02-01) — and implements the `activate` command
+// (internal/flutter/activation.go).
 //
 // The executable entrypoint is cmd/flutter-adapter/main.go; the binary
 // name convention is `anvil-adapter-flutter` (see
@@ -38,19 +40,21 @@ const Framework = "flutter"
 
 // Capabilities returns the Flutter adapter's declared capabilities: the
 // hybrid deployment model (TS-P7-20 AC-3, ADR-016 — releases are built
-// and packaged for distribution, no server activation), the build targets
-// it supports (TS-P7-21), and the verification checks it provides
-// (TS-P7-25). The declaration intentionally lists no activation phases —
-// the hybrid model has none (TS-P7-20 AC-5, EPIC-007 §7.3). The Core
-// reads this declaration through the `capabilities` command to determine
-// what to invoke (TS-P7-07, TS-P7-08).
+// and packaged for distribution, activated through the hybrid model's
+// activation phases, TS-018-02-01), the activation phases it declares in
+// declared order (pub_get, platform_sync), the build targets it supports
+// (TS-P7-21), and the verification checks it provides (TS-P7-25). The
+// Core reads this declaration through the `capabilities` command to
+// determine what to invoke (TS-P7-07, TS-P7-08).
 //
-// Reference: TS-P7-20 AC-2..AC-5, TS-P7-21, TS-P7-25, TS-P7-07, ADR-016
+// Reference: TS-P7-20 AC-2..AC-5, TS-P7-21, TS-P7-25, TS-P7-07,
+// TS-018-02-01, ADR-016
 func Capabilities() contracts.CapabilityResult {
 	return contracts.CapabilityResult{
 		Declaration: contracts.CapabilityDeclaration{
-			DeploymentModel: string(contracts.DeploymentModelHybrid),
-			BuildPhases:     buildPhaseNames(),
+			DeploymentModel:  string(contracts.DeploymentModelHybrid),
+			ActivationPhases: activationPhaseNames(),
+			BuildPhases:      buildPhaseNames(),
 			VerificationChecks: []contracts.VerificationCheck{
 				{
 					Name:        CheckPubspecYaml,
@@ -59,6 +63,22 @@ func Capabilities() contracts.CapabilityResult {
 				{
 					Name:        CheckLibDirectory,
 					Description: "validates that the lib/ directory exists in the artifact",
+				},
+				{
+					Name:        CheckDependencyLockfile,
+					Description: "validates that the release's locked dependency set is wired: pubspec.lock present so activation re-resolves the built set (lifecycle-conformity, TS-018-03-02)",
+				},
+				{
+					Name:        CheckDependencyTiming,
+					Description: "validates re-checkable evidence that dependency resolution can run at the declared pre-promotion timing: manifest and locked set present, locked set covers the declared dependencies (lifecycle-conformity, TS-018-03-02)",
+				},
+				{
+					Name:        CheckPlatformSyncReady,
+					Description: "validates the platform step at its declared lifecycle point: ios/ directory present carries ios/Podfile, the platform_sync input (lifecycle-conformity, TS-018-03-02)",
+				},
+				{
+					Name:        CheckRollbackBehavior,
+					Description: "validates that rollback produces the declared state: per-phase rollback coverage with the phase-table-derived rollback surface kept to the declared single re-resolution (standard-internal drift guard, TS-018-03-02)",
 				},
 			},
 		},

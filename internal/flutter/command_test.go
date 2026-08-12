@@ -1,8 +1,7 @@
 // Tests for the Flutter adapter command dispatcher: each supported
-// command, unknown commands (including the absent activate), malformed
-// JSON, and argument errors — all exercised in-process on the dispatch
-// function (the executable entrypoint is a thin os.Exit wrapper around
-// it).
+// command, unknown commands, malformed JSON, and argument errors — all
+// exercised in-process on the dispatch function (the executable
+// entrypoint is a thin os.Exit wrapper around it).
 package flutter
 
 import (
@@ -36,8 +35,9 @@ func decodeStdout(t *testing.T, stdout string, out any) {
 }
 
 // TestRun_Capabilities verifies the capabilities command prints the
-// declared capabilities JSON and exits 0: hybrid deployment model, no
-// activation phases, and the three build targets (TS-P7-20).
+// declared capabilities JSON and exits 0: hybrid deployment model, the
+// hybrid activation phases in declared order, and the three build
+// targets (TS-P7-20, TS-018-02-01).
 func TestRun_Capabilities(t *testing.T) {
 	code, stdout, stderr := runDispatch(t, nil,
 		contracts.CommandCapabilities, `{"framework":"flutter"}`)
@@ -51,8 +51,9 @@ func TestRun_Capabilities(t *testing.T) {
 	if result.Declaration.DeploymentModel != string(contracts.DeploymentModelHybrid) {
 		t.Errorf("DeploymentModel = %q, want %q", result.Declaration.DeploymentModel, contracts.DeploymentModelHybrid)
 	}
-	if len(result.Declaration.ActivationPhases) != 0 {
-		t.Errorf("ActivationPhases = %v, want none (TS-P7-20 AC-5)", result.Declaration.ActivationPhases)
+	wantActivationPhases := []string{PhasePubGet, PhasePlatformSync}
+	if !reflectEqual(result.Declaration.ActivationPhases, wantActivationPhases) {
+		t.Errorf("ActivationPhases = %v, want %v (TS-018-02-01)", result.Declaration.ActivationPhases, wantActivationPhases)
 	}
 	wantBuildPhases := []string{TargetWeb, TargetApk, TargetIos}
 	if !reflectEqual(result.Declaration.BuildPhases, wantBuildPhases) {
@@ -155,20 +156,46 @@ func TestRun_Extension(t *testing.T) {
 	}
 }
 
-// TestRun_ActivateNotSupported verifies the activate command is NOT
-// supported: the hybrid deployment model has no server activation, so
-// the dispatcher reports an unknown command with exit 2 (TS-P7-20 AC-5,
-// EPIC-007 §7.3).
-func TestRun_ActivateNotSupported(t *testing.T) {
-	code, stdout, stderr := runDispatch(t, nil, contracts.CommandActivation, `{}`)
-	if code != ExitUsage {
-		t.Fatalf("exit code = %d, want %d (stderr: %s)", code, ExitUsage, stderr)
+// TestRun_Activate verifies the activate command dispatches one
+// activation phase operation: it parses the ActivationRequest, runs the
+// phase through the injectable runners, prints the ActivationResult JSON
+// with exit 0 — the hybrid model's activation phases (TS-018-02-01).
+func TestRun_Activate(t *testing.T) {
+	withPlatform(t, PlatformDarwin)
+	dir := releaseDirWithIOS(t)
+	runner := &fakeRunner{output: "ok"}
+	pod := &fakeRunner{output: "ok"}
+	adapter := &Adapter{activationRunner: runner.run, podRunner: pod.run}
+
+	payload, err := json.Marshal(contracts.ActivationRequest{
+		Phase:     PhasePlatformSync,
+		Operation: contracts.PhaseOperationActivate,
+		Release: contracts.ReleaseContext{
+			ProjectID:  "project-1",
+			ReleaseID:  "release-1",
+			WorkingDir: dir,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
 	}
-	if !strings.Contains(stderr, `unknown command "activate"`) {
-		t.Errorf("stderr = %q, want mention of the unsupported activate command", stderr)
+
+	var stdout, stderr bytes.Buffer
+	code := adapter.Run([]string{contracts.CommandActivation, string(payload)}, &stdout, &stderr)
+	if code != ExitOK {
+		t.Fatalf("exit code = %d, want %d (stderr: %s)", code, ExitOK, stderr.String())
 	}
-	if stdout != "" {
-		t.Errorf("stdout = %q, want empty for a failed dispatch", stdout)
+
+	var result contracts.ActivationResult
+	decodeStdout(t, stdout.String(), &result)
+	if !result.Success {
+		t.Fatalf("Success = false, want true (result: %#v)", result)
+	}
+	if len(pod.args) != 1 || !reflectEqual(pod.args[0], []string{"install"}) {
+		t.Errorf("pod args = %v, want [install]", pod.args)
+	}
+	if len(runner.args) != 0 {
+		t.Errorf("flutter runner args = %v, want none for platform_sync", runner.args)
 	}
 }
 
@@ -344,12 +371,11 @@ func TestAdapter_RunnerRequiredForBuild(t *testing.T) {
 	}
 }
 
-// TestRun_ManifestEmpty verifies the manifest command returns an EMPTY
-// result: the hybrid deployment model has no server activation, so there
-// are no activation or rollback commands to store in the artifact
-// manifest (TS-P7-20 AC-5, ADR-016, 005-adapter-command-contract
-// §10.10). The packaging layer omits the empty slices from the manifest.
-func TestRun_ManifestEmpty(t *testing.T) {
+// TestRun_Manifest verifies the manifest command returns the hybrid
+// model's activation and rollback command strings in execution order —
+// the strings derive from the declared activation phase table
+// (TS-018-02-01, ADR-017, 005-adapter-command-contract §10.10).
+func TestRun_Manifest(t *testing.T) {
 	code, stdout, stderr := runDispatch(t, nil, contracts.CommandManifest)
 	if code != ExitOK {
 		t.Fatalf("exit code = %d, want %d (stderr: %s)", code, ExitOK, stderr)
@@ -358,17 +384,21 @@ func TestRun_ManifestEmpty(t *testing.T) {
 	var result contracts.ManifestCommandResult
 	decodeStdout(t, stdout, &result)
 
-	if len(result.ActivationCommands) != 0 {
-		t.Errorf("ActivationCommands = %v, want none", result.ActivationCommands)
+	wantActivation := []string{"flutter pub get", "pod install"}
+	if !reflectEqual(result.ActivationCommands, wantActivation) {
+		t.Errorf("ActivationCommands = %v, want %v", result.ActivationCommands, wantActivation)
 	}
-	if len(result.RollbackCommands) != 0 {
-		t.Errorf("RollbackCommands = %v, want none", result.RollbackCommands)
+	wantRollback := []string{"flutter pub get"}
+	if !reflectEqual(result.RollbackCommands, wantRollback) {
+		t.Errorf("RollbackCommands = %v, want %v", result.RollbackCommands, wantRollback)
 	}
 }
 
 // TestRun_Template verifies the template command prints the adapter-owned
 // pipeline definitions (build + ci) as valid JSON and exits 0 (TS-007-038,
-// ADR-020 §1).
+// TS-018-02-02, ADR-020 §1). The build definition covers the Flutter
+// hybrid build steps: the dependencies stage (`flutter pub get`) and the
+// build stage with the target tasks.
 func TestRun_Template(t *testing.T) {
 	code, stdout, stderr := runDispatch(t, nil,
 		contracts.CommandTemplate, `{"framework":"flutter"}`)
@@ -385,12 +415,15 @@ func TestRun_Template(t *testing.T) {
 	if result.Build.Pipeline.Name != "build" {
 		t.Errorf("Build.Pipeline.Name = %q, want %q", result.Build.Pipeline.Name, "build")
 	}
-	if len(result.Build.Pipeline.Stages) != 1 {
-		t.Fatalf("Build stages = %d, want 1", len(result.Build.Pipeline.Stages))
+	if len(result.Build.Pipeline.Stages) != 2 {
+		t.Fatalf("Build stages = %d, want 2 (dependencies, build)", len(result.Build.Pipeline.Stages))
 	}
-	tasks := result.Build.Pipeline.Stages[0].Tasks
+	if result.Build.Pipeline.Stages[0].Name != "dependencies" {
+		t.Errorf("Build stage[0].Name = %q, want %q", result.Build.Pipeline.Stages[0].Name, "dependencies")
+	}
+	tasks := result.Build.Pipeline.Stages[1].Tasks
 	if len(tasks) != 3 {
-		t.Fatalf("Build tasks = %d, want 3 (web, apk, ios)", len(tasks))
+		t.Fatalf("Build stage tasks = %d, want 3 (web, apk, ios)", len(tasks))
 	}
 	// The template must preserve the ADR-018 platform metadata.
 	for _, task := range tasks {
@@ -414,9 +447,11 @@ func TestRun_Template(t *testing.T) {
 }
 
 // TestRun_TemplateBuildMatchesBuildTargets verifies the single-source
-// requirement (TS-007-038): the template's tasks mirror the commands of
-// the adapter's build target table — the same framework knowledge must
-// not drift between the template and the executed build phases.
+// requirement (TS-007-038): the template's build stage tasks mirror the
+// commands of the adapter's build target table — the same framework
+// knowledge must not drift between the template and the executed build
+// phases. (The dependencies stage is not a build target; the single-source
+// invariant applies to the build stage.)
 func TestRun_TemplateBuildMatchesBuildTargets(t *testing.T) {
 	code, stdout, stderr := runDispatch(t, nil,
 		contracts.CommandTemplate, `{"framework":"flutter"}`)
@@ -427,9 +462,9 @@ func TestRun_TemplateBuildMatchesBuildTargets(t *testing.T) {
 	var result contracts.TemplateResult
 	decodeStdout(t, stdout, &result)
 
-	tasks := result.Build.Pipeline.Stages[0].Tasks
+	tasks := result.Build.Pipeline.Stages[1].Tasks
 	if len(tasks) != len(buildTargets) {
-		t.Fatalf("template tasks = %d, want %d", len(tasks), len(buildTargets))
+		t.Fatalf("template build stage tasks = %d, want %d", len(tasks), len(buildTargets))
 	}
 	for i, target := range buildTargets {
 		task := tasks[i]

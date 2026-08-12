@@ -1,20 +1,37 @@
 # Build pipeline template of the Flutter delivery lifecycle standard
-# (TS-007-038, ADR-020 §1): the pipeline definition the standard owns and
-# returns through the `template` command. The Anvil Runtime validates it
-# through the pipeline loader and writes it to .anvil/pipelines/build.yaml
-# at project init. This file is the committed documentation copy of that
-# definition — the standard executable is the authoritative source.
+# (TS-007-038, TS-018-02-02, ADR-020 §1): the pipeline definition the
+# standard owns and returns through the `template` command. The Anvil
+# Runtime validates it through the pipeline loader and writes it to
+# .anvil/pipelines/build.yaml at project init. This file is the committed
+# documentation copy of that definition — the standard executable is the
+# authoritative source.
 #
-# The tasks mirror the standard's build target table (internal/flutter/
-# build.go): the same commands, the same order (web → apk → ios), and the
-# same ADR-018 platform metadata, so the local engine keeps its
-# platform-aware execution (skip unsupported targets with a warning;
-# --target selection; --strict failure). The explicit timeouts (10m web,
-# 15m apk) are preserved: Flutter builds (first Gradle run in particular)
-# routinely exceed the engine's 5-minute default.
+# The pipeline covers the Flutter hybrid build steps at the same
+# convention depth as the Laravel template (Review 19 §3.3):
+#
+#   - dependencies: `flutter pub get` resolves the package graph before
+#     any build can run (the same position Laravel's composer install
+#     holds). It is a dependency step, not a build target — no ADR-018
+#     target metadata, no timeout (fast and platform-independent).
+#
+#   - build: the targets from the standard's build target table
+#     (internal/flutter/build.go): the same commands, the same order
+#     (web → apk → ios), and the same ADR-018 platform metadata, so the
+#     local engine keeps its platform-aware execution (skip unsupported
+#     targets with a warning; --target selection; --strict failure). The
+#     explicit timeouts (10m web, 15m apk) are preserved: Flutter builds
+#     (first Gradle run in particular) routinely exceed the engine's
+#     5-minute default.
 pipeline:
     name: build
     stages:
+        - name: dependencies
+          tasks:
+            - name: flutter-pub-get
+              command: flutter
+              args:
+                - pub
+                - get
         - name: build
           tasks:
             - name: flutter-web

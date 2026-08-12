@@ -61,7 +61,10 @@ type manifest struct {
 // TestSevenPartStructureExists verifies that the repository carries the
 // seven-part standard structure (ADR-021 §3.2, Transition Plan §5.4):
 // Manifest, Lifecycle Definition, Verification, Templates, Compatibility,
-// Documentation, Tests.
+// Documentation, Tests. Existence alone is not acceptance evidence —
+// each part must carry content, so the test also verifies that every
+// part document is non-trivial (the ADR-027 structure bar: all seven
+// parts present, not placeholders).
 func TestSevenPartStructureExists(t *testing.T) {
 	root := repoRoot(t)
 
@@ -75,8 +78,14 @@ func TestSevenPartStructureExists(t *testing.T) {
 		"Tests":                filepath.Join("tests", "README.md"),
 	}
 	for part, rel := range parts {
-		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+		path := filepath.Join(root, rel)
+		info, err := os.Stat(path)
+		if err != nil {
 			t.Errorf("part %q missing: %s (%v)", part, rel, err)
+			continue
+		}
+		if info.Size() < 200 {
+			t.Errorf("part %q (%s) is %d bytes — expected a non-trivial content document, not a placeholder", part, rel, info.Size())
 		}
 	}
 }
