@@ -1,0 +1,95 @@
+{
+  "$schema": "urn:anvil:spec:registry-metadata:1.0.0",
+  "title": "Flutter Delivery Lifecycle Standard",
+  "description": "The Flutter delivery lifecycle standard for the Anvil Runtime: Flutter lifecycle content for the hybrid deployment model — build targets (web, apk, ios), structural verification checks, configuration extension, and pipeline templates — exchanged over the standard command contract.",
+  "id": "anvil-standard-flutter",
+  "version": "1.1.1",
+  "contractVersion": "1.0.0",
+  "capability": {
+    "frameworkVersion": [
+      "3.0.0",
+      "3.3.0",
+      "3.7.0",
+      "3.10.0",
+      "3.13.0",
+      "3.16.0",
+      "3.19.0",
+      "3.22.0",
+      "3.24.0",
+      "3.27.0",
+      "3.29.0",
+      "3.32.0"
+    ]
+  },
+  "distribution": {
+    "type": "github-releases",
+    "location": "https://github.com/maleolabs/anvil-standard-flutter/releases/download/v1.1.1/anvil-standard-flutter-1.1.1.tar.gz"
+  },
+  "lifecycle": {
+    "state": "published"
+  },
+  "trust": {
+    "contentDigests": [
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "429ea0f9f519c74a31eeaea476fd283e800150255dc83692551b99d2c9d5caab"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "4a7897b2fbc5522854daee01320b0379a3542576c659298a740d1ac3893136f5",
+        "name": "anvil-adapter-flutter-darwin-amd64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "c6250d5316f97d3bcc036b5076276cc252e984b55800bba656865a0fbf7c50e0",
+        "name": "anvil-adapter-flutter-darwin-arm64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "c87d715166f208666f162df9faf12c9d7018d0f68f990767a9e8f175319e09ac",
+        "name": "anvil-adapter-flutter-linux-amd64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "c4ca87a3d6518694a8e9183c18f8f4f7886337bab252ae72eb59ac386a010828",
+        "name": "anvil-adapter-flutter-linux-arm64"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "f58c70e9bb90c90667643ceb4fbd3a6f37fb852ac3043f2c0347cc72b63230bc",
+        "name": "anvil-skill-flutter-conventions-1-0-0"
+      },
+      {
+        "algorithm": "sha-256",
+        "encoding": "base16",
+        "digest": "4db8876d8038a26b5e7cde2c933b1507c31c5f1f1a6ea17893f87ec3041f8cfe",
+        "name": "anvil-skill-flutter-delivery-1-0-0"
+      }
+    ],
+    "attestation": {
+      "algorithm": "ed25519",
+      "signature": "aoC5ouqlYf5SqNFeCDjFrAm1QwCKV3SFYKkMz5J9PyvydjYb/hapotZNsw4akNoZlR0yDV/f/7geD3ZIyDPJAA==",
+      "publicKey": "ya31r2iME6xVRlwJtUg4v6gQ+QeT15XO3jaMlAG2hL8="
+    }
+  },
+  "skills": [
+    {
+      "name": "flutter-conventions",
+      "version": "1.0.0",
+      "asset": "anvil-skill-flutter-conventions-1-0-0",
+      "description": "Flutter project conventions under the Anvil delivery lifecycle standard: hybrid build model, scaffold, build pipeline, configuration surface, and verification expectations. Use when working on a Flutter project managed by Anvil."
+    },
+    {
+      "name": "flutter-delivery",
+      "version": "1.0.0",
+      "asset": "anvil-skill-flutter-delivery-1-0-0",
+      "description": "The Flutter delivery lifecycle under Anvil: activation phases for the hybrid deployment model (pub_get before promotion, platform_sync), rollback and failure semantics, and how to adopt the lifecycle for a Flutter project."
+    }
+  ]
+}
