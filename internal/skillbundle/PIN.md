@@ -14,7 +14,7 @@ base — the same commit that carries the ST-021-03 packer).
 1. **Go internal rule.** The Core packer lives under
    `maleolabs.com/anvil/internal/`; Go's internal-package rule only allows
    imports from packages inside the `maleolabs.com/anvil/` tree. This
-   module's import paths (`maleolabs.com/anvil-standard-laravel/...`) sit
+   module's import paths (`maleolabs.com/anvil-standard-flutter/...`) sit
    outside it, so `internal/skillpack` / `internal/skillbundle` cannot be
    imported cross-module.
 2. **Not published to the Go module proxy.** `go run
@@ -39,7 +39,7 @@ base — the same commit that carries the ST-021-03 packer).
   pins (`v3.0.1`): the vendored frontmatter parser must behave identically.
 - The authored skill content lives in `skills/` (skills.json + one
   directory per skill); it is the authoring source, seeded from the Core
-  fixture `fixtures/standard-skills/anvil-standard-laravel/skills` at
+  fixture `fixtures/standard-skills/anvil-standard-flutter/skills` at
   TS-021-06.
 
 ## Byte-identity guard
