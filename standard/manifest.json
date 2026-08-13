@@ -3,7 +3,7 @@
   "title": "Flutter Delivery Lifecycle Standard",
   "description": "The Flutter delivery lifecycle standard for the Anvil Runtime: Flutter lifecycle content for the hybrid deployment model — build targets (web, apk, ios), structural verification checks, configuration extension, and pipeline templates — exchanged over the standard command contract.",
   "id": "anvil-standard-flutter",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "contractVersion": "1.0.0",
   "capability": {
     "frameworkVersion": [
